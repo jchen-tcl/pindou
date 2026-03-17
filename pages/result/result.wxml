@@ -2,9 +2,9 @@
   <view class="card compare">
     <view class="h">图像预览</view>
     <view class="compare-switch">
+      <view class="tab-btn {{previewMode === 'origin' ? 'tab-active' : ''}}" data-mode="origin" bindtap="switchPreview">原图</view>
       <view class="tab-btn {{previewMode === 'effect' ? 'tab-active' : ''}}" data-mode="effect" bindtap="switchPreview">效果图</view>
       <view class="tab-btn {{previewMode === 'effect_code' ? 'tab-active' : ''}}" data-mode="effect_code" bindtap="switchPreview">效果图+色号</view>
-      <view class="tab-btn {{previewMode === 'origin' ? 'tab-active' : ''}}" data-mode="origin" bindtap="switchPreview">原图</view>
     </view>
     <view class="preview-stage" style="padding-top: {{previewPadding}}%;">
       <image src="{{imagePath}}" mode="aspectFit" class="preview-node" hidden="{{previewMode !== 'origin'}}" />
@@ -33,8 +33,8 @@
   <view class="card export">
     <view class="h">导出</view>
     <view class="export-row">
-      <button class="primary-btn ex-btn" bindtap="exportImage">保存效果图PNG</button>
-      <button class="ghost-btn ex-btn" bindtap="exportExcel">导出效果图Excel</button>
+      <button class="primary-btn ex-btn" bindtap="exportImage">保存效果图</button>
+      <button class="ghost-btn ex-btn" bindtap="exportExcel">导出Excel</button>
     </view>
   </view>
 </view>

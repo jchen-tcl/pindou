@@ -256,6 +256,56 @@ Page({
       }
     })
   },
+  ensureAlbumPermission() {
+    return new Promise((resolve, reject) => {
+      wx.getSetting({
+        success: (settingRes) => {
+          const authSetting = settingRes?.authSetting || {}
+          if (authSetting['scope.writePhotosAlbum']) {
+            resolve()
+            return
+          }
+          wx.authorize({
+            scope: 'scope.writePhotosAlbum',
+            success: () => {
+              resolve()
+            },
+            fail: () => {
+              wx.showModal({
+                title: '需要相册权限',
+                content: '请在设置中开启“保存到相册”权限后重试',
+                confirmText: '去设置',
+                success: (modalRes) => {
+                  if (!modalRes.confirm) {
+                    reject(new Error('album permission denied'))
+                    return
+                  }
+                  wx.openSetting({
+                    success: (openRes) => {
+                      if (openRes?.authSetting?.['scope.writePhotosAlbum']) {
+                        resolve()
+                        return
+                      }
+                      reject(new Error('album permission denied'))
+                    },
+                    fail: () => {
+                      reject(new Error('open setting failed'))
+                    }
+                  })
+                },
+                fail: () => {
+                  reject(new Error('show modal failed'))
+                }
+              })
+            }
+          })
+        },
+        fail: () => {
+          reject(new Error('get setting failed'))
+        }
+      })
+    })
+  },
   exportImage() {
     const save = (filePath) => {
       wx.saveImageToPhotosAlbum({
@@ -263,14 +313,31 @@ Page({
         success: () => {
           wx.showToast({ title: '已保存到相册', icon: 'none' })
         },
-        fail: () => {
-          wx.showToast({ title: '保存失败，请检查权限', icon: 'none' })
+        fail: (error) => {
+          const errMsg = String(error?.errMsg || '')
+          if (/auth deny|authorize no response|permission/i.test(errMsg)) {
+            this.ensureAlbumPermission()
+              .then(() => {
+                save(filePath)
+              })
+              .catch(() => {
+                wx.showToast({ title: '未开启相册权限', icon: 'none' })
+              })
+            return
+          }
+          wx.showToast({ title: '保存失败，请重试', icon: 'none' })
         }
       })
     }
     this.ensureEffectReady()
       .then((path) => {
-        save(path)
+        this.ensureAlbumPermission()
+          .then(() => {
+            save(path)
+          })
+          .catch(() => {
+            wx.showToast({ title: '未开启相册权限', icon: 'none' })
+          })
       })
       .catch(() => {
         wx.showToast({ title: '效果图未生成', icon: 'none' })
