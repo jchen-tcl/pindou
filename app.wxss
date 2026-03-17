@@ -1,0 +1,25 @@
+page {
+  background: #f6fbff;
+  color: #2e3d4f;
+  font-size: 28rpx;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 28rpx;
+  box-shadow: 0 10rpx 28rpx rgba(153, 185, 220, 0.18);
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #9cc9ff 0%, #8ad8f6 100%);
+  color: #ffffff;
+  border-radius: 999rpx;
+  font-weight: 600;
+}
+
+.ghost-btn {
+  background: #fff;
+  color: #5f89b5;
+  border: 2rpx solid #c9ddf3;
+  border-radius: 999rpx;
+}

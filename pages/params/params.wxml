@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="card section">
+    <view class="h">选择成品尺寸</view>
+    <view class="chips">
+      <view wx:for="{{sizeOptions}}" wx:key="value" class="chip {{size === item.value ? 'chip-active' : ''}}" data-value="{{item.value}}" bindtap="setSize">{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="h">选择颗粒网格</view>
+    <view class="chips">
+      <view wx:for="{{gridOptions}}" wx:key="value" class="chip {{grid === item.value ? 'chip-active' : ''}}" data-value="{{item.value}}" bindtap="setGrid">{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="card section">
+    <view class="h">颜色数量：{{colorCount}}色</view>
+    <slider min="8" max="32" step="8" value="{{colorCount}}" activeColor="#ff8fbe" block-color="#ffd0e4" bindchange="setColorCount" />
+  </view>
+
+  <view class="card section">
+    <view class="h">风格强度</view>
+    <radio-group bindchange="setStyleMode">
+      <label class="radio-item">
+        <radio value="restore" checked="{{styleMode==='restore'}}" color="#ff8fbe" />
+        <text>还原优先</text>
+      </label>
+      <label class="radio-item">
+        <radio value="cute" checked="{{styleMode==='cute'}}" color="#ff8fbe" />
+        <text>可爱优化</text>
+      </label>
+    </radio-group>
+  </view>
+
+  <view class="card section preview-box">
+    <view class="h">预览</view>
+    <image src="{{imagePath}}" mode="aspectFit" class="preview" />
+  </view>
+
+  <button class="primary-btn next" bindtap="startConvert">开始转换</button>
+</view>

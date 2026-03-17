@@ -1,0 +1,9 @@
+{
+  "desc": "更多信息请参考微信小程序 sitemap 协议",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

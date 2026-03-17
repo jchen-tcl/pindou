@@ -1,0 +1,72 @@
+.page {
+  padding: 24rpx;
+}
+
+.hero {
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  background: linear-gradient(140deg, #eef7ff 0%, #f7fbff 100%);
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #5b89b6;
+}
+
+.sub {
+  margin-top: 12rpx;
+  color: #556a80;
+  line-height: 1.5;
+}
+
+.upload {
+  padding: 24rpx;
+}
+
+.preview-wrap {
+  height: 420rpx;
+  background: #f3f9ff;
+  border: 2rpx dashed #c8def3;
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.preview {
+  width: 100%;
+  height: 100%;
+}
+
+.empty {
+  color: #7c9ab8;
+  text-align: center;
+  padding: 0 40rpx;
+}
+
+.action {
+  margin-top: 16rpx;
+}
+
+.meta {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #7590a8;
+  text-align: center;
+}
+
+.next {
+  margin-top: 26rpx;
+}
+
+.crop-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 1200px;
+  height: 1200px;
+  opacity: 0;
+  pointer-events: none;
+}

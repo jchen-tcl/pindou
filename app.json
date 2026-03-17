@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/params/params",
+    "pages/result/result"
+  ],
+  "window": {
+    "navigationBarTitleText": "拼豆转换器",
+    "navigationBarBackgroundColor": "#EAF5FF",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F6FBFF",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

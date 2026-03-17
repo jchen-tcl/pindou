@@ -1,0 +1,19 @@
+<view class="page">
+  <view class="hero card">
+    <view class="title">拼豆转换器</view>
+    <view class="sub">上传图片后自动裁切，3步生成拼豆图纸</view>
+  </view>
+
+  <view class="upload card">
+    <view class="preview-wrap">
+      <image wx:if="{{imagePath}}" src="{{imagePath}}" mode="aspectFit" class="preview" />
+      <view wx:else class="empty">🌈 还没有图片，点下面按钮开始吧</view>
+    </view>
+    <button class="primary-btn action" bindtap="chooseImage">上传图片</button>
+    <button class="ghost-btn action" bindtap="takePhoto">拍照导入</button>
+    <view wx:if="{{imagePath}}" class="meta">建议使用正方形主体照片，效果更稳定</view>
+  </view>
+
+  <button wx:if="{{imagePath}}" class="primary-btn next" bindtap="goParams">下一步</button>
+  <canvas canvas-id="cropCanvas" class="crop-canvas"></canvas>
+</view>

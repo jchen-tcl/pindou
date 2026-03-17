@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="card compare">
+    <view class="h">图像预览</view>
+    <view class="compare-switch">
+      <view class="tab-btn {{previewMode === 'effect' ? 'tab-active' : ''}}" data-mode="effect" bindtap="switchPreview">效果图</view>
+      <view class="tab-btn {{previewMode === 'effect_code' ? 'tab-active' : ''}}" data-mode="effect_code" bindtap="switchPreview">效果图+色号</view>
+      <view class="tab-btn {{previewMode === 'origin' ? 'tab-active' : ''}}" data-mode="origin" bindtap="switchPreview">原图</view>
+    </view>
+    <view class="preview-stage" style="padding-top: {{previewPadding}}%;">
+      <image src="{{imagePath}}" mode="aspectFit" class="preview-node" hidden="{{previewMode !== 'origin'}}" />
+      <canvas type="2d" id="effectCanvas" class="preview-node effect-canvas" hidden="{{previewMode !== 'effect'}}"></canvas>
+      <canvas type="2d" id="effectCodeCanvas" class="preview-node effect-canvas" hidden="{{previewMode !== 'effect_code'}}"></canvas>
+    </view>
+  </view>
+
+  <view class="card stats">
+    <view class="h">制作信息</view>
+    <view class="line">成品尺寸：{{sizeLabel}}</view>
+    <view class="line">拼豆网格：{{grid}}</view>
+    <view class="line">颜色数量：{{colorCount}}色</view>
+    <view class="line">总颗粒数：{{total}}颗</view>
+  </view>
+
+  <view class="card list">
+    <view class="h">颜色用量清单</view>
+    <view class="row" wx:for="{{detail}}" wx:key="code">
+      <view class="dot" style="background: {{item.code}};"></view>
+      <view class="name">{{item.name}} ({{item.code}})</view>
+      <view class="count">{{item.count}}颗</view>
+    </view>
+  </view>
+
+  <view class="card export">
+    <view class="h">导出</view>
+    <view class="export-row">
+      <button class="primary-btn ex-btn" bindtap="exportImage">保存效果图PNG</button>
+      <button class="ghost-btn ex-btn" bindtap="exportExcel">导出效果图Excel</button>
+    </view>
+  </view>
+</view>
