@@ -61,6 +61,13 @@
   margin-top: 26rpx;
 }
 
+.version-text {
+  margin-top: 28rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #9db2c6;
+}
+
 .crop-canvas {
   position: fixed;
   left: -9999px;

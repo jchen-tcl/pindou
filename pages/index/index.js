@@ -1,15 +1,17 @@
+const { APP_VERSION } = require('../../utils/version')
+
 Page({
   data: {
-    imagePath: ''
+    imagePath: '',
+    appVersion: ''
   },
   onShow() {
     const app = getApp()
     const taskData = app.globalData.taskData || {}
-    if (taskData.imagePath) {
-      this.setData({
-        imagePath: taskData.imagePath || ''
-      })
-    }
+    this.setData({
+      imagePath: taskData.imagePath || '',
+      appVersion: app.globalData.appVersion || APP_VERSION
+    })
   },
   chooseImage() {
     this.pickImage(['album'])

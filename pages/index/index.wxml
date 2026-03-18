@@ -15,5 +15,6 @@
   </view>
 
   <button wx:if="{{imagePath}}" class="primary-btn next" bindtap="goParams">下一步</button>
+  <view class="version-text">版本号 {{appVersion}}</view>
   <canvas canvas-id="cropCanvas" class="crop-canvas"></canvas>
 </view>

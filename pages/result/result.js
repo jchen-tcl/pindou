@@ -256,76 +256,144 @@ Page({
       }
     })
   },
-  ensureAlbumPermission() {
+  parseSaveErrorType(error) {
+    const errMsg = String(error?.errMsg || error?.message || '').toLowerCase()
+    if (/privacy/.test(errMsg)) {
+      return 'privacy_denied'
+    }
+    if (/cancel/.test(errMsg)) {
+      return 'user_cancel'
+    }
+    if (/file.*not.*found|no such file|invalid file/.test(errMsg)) {
+      return 'invalid_file'
+    }
+    if (/auth deny|authorize no response|permission/.test(errMsg)) {
+      return 'permission_denied'
+    }
+    if (/saveimage/.test(errMsg) && /fail/.test(errMsg)) {
+      return 'save_failed'
+    }
+    return 'unknown'
+  },
+  showSaveErrorToast(type) {
+    const map = {
+      privacy_denied: '请先同意隐私授权',
+      permission_denied: '未开启相册权限',
+      invalid_file: '图片缓存失效，请重试',
+      user_cancel: '已取消保存',
+      save_failed: '保存失败，请重试',
+      unknown: '保存失败，请重试'
+    }
+    wx.showToast({ title: map[type] || map.unknown, icon: 'none' })
+  },
+  ensurePrivacyAuthorize() {
     return new Promise((resolve, reject) => {
-      wx.getSetting({
-        success: (settingRes) => {
-          const authSetting = settingRes?.authSetting || {}
-          if (authSetting['scope.writePhotosAlbum']) {
+      if (typeof wx.getPrivacySetting !== 'function' || typeof wx.requirePrivacyAuthorize !== 'function') {
+        resolve()
+        return
+      }
+      wx.getPrivacySetting({
+        success: (res) => {
+          if (!res?.needAuthorization) {
             resolve()
             return
           }
-          wx.authorize({
-            scope: 'scope.writePhotosAlbum',
-            success: () => {
-              resolve()
-            },
-            fail: () => {
-              wx.showModal({
-                title: '需要相册权限',
-                content: '请在设置中开启“保存到相册”权限后重试',
-                confirmText: '去设置',
-                success: (modalRes) => {
-                  if (!modalRes.confirm) {
-                    reject(new Error('album permission denied'))
-                    return
-                  }
-                  wx.openSetting({
-                    success: (openRes) => {
-                      if (openRes?.authSetting?.['scope.writePhotosAlbum']) {
-                        resolve()
-                        return
-                      }
-                      reject(new Error('album permission denied'))
-                    },
-                    fail: () => {
-                      reject(new Error('open setting failed'))
-                    }
-                  })
-                },
-                fail: () => {
-                  reject(new Error('show modal failed'))
-                }
-              })
-            }
+          wx.requirePrivacyAuthorize({
+            success: () => resolve(),
+            fail: () => reject(new Error('privacy denied'))
           })
         },
         fail: () => {
-          reject(new Error('get setting failed'))
+          resolve()
         }
       })
     })
   },
+  ensureAlbumPermission() {
+    return new Promise((resolve, reject) => {
+      this.ensurePrivacyAuthorize()
+        .then(() => {
+          wx.getSetting({
+            success: (settingRes) => {
+              const authSetting = settingRes?.authSetting || {}
+              if (authSetting['scope.writePhotosAlbum']) {
+                resolve()
+                return
+              }
+              wx.authorize({
+                scope: 'scope.writePhotosAlbum',
+                success: () => {
+                  resolve()
+                },
+                fail: () => {
+                  wx.showModal({
+                    title: '需要相册权限',
+                    content: '请在设置中开启“保存到相册”权限后重试',
+                    confirmText: '去设置',
+                    success: (modalRes) => {
+                      if (!modalRes.confirm) {
+                        reject(new Error('album permission denied'))
+                        return
+                      }
+                      wx.openSetting({
+                        success: (openRes) => {
+                          if (openRes?.authSetting?.['scope.writePhotosAlbum']) {
+                            resolve()
+                            return
+                          }
+                          reject(new Error('album permission denied'))
+                        },
+                        fail: () => {
+                          reject(new Error('open setting failed'))
+                        }
+                      })
+                    },
+                    fail: () => {
+                      reject(new Error('show modal failed'))
+                    }
+                  })
+                }
+              })
+            },
+            fail: () => {
+              reject(new Error('get setting failed'))
+            }
+          })
+        })
+        .catch(reject)
+    })
+  },
   exportImage() {
-    const save = (filePath) => {
+    const save = (filePath, retryCount = 0) => {
       wx.saveImageToPhotosAlbum({
         filePath,
         success: () => {
           wx.showToast({ title: '已保存到相册', icon: 'none' })
         },
         fail: (error) => {
-          const errMsg = String(error?.errMsg || '')
-          if (/auth deny|authorize no response|permission/i.test(errMsg)) {
-            this.ensureAlbumPermission()
-              .then(() => {
-                save(filePath)
+          const type = this.parseSaveErrorType(error)
+          if (type === 'invalid_file' && retryCount < 1) {
+            this.effectImagePath = ''
+            this.ensureEffectReady()
+              .then((newPath) => {
+                save(newPath, retryCount + 1)
               })
               .catch(() => {
-                wx.showToast({ title: '未开启相册权限', icon: 'none' })
+                wx.showToast({ title: '效果图未生成', icon: 'none' })
               })
             return
           }
-          wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+          if (type === 'permission_denied') {
+            this.ensureAlbumPermission()
+              .then(() => {
+                save(filePath, retryCount + 1)
+              })
+              .catch((permError) => {
+                this.showSaveErrorToast(this.parseSaveErrorType(permError))
+              })
+            return
+          }
+          this.showSaveErrorToast(type)
         }
       })
     }
@@ -335,8 +403,8 @@ Page({
           .then(() => {
             save(path)
           })
-          .catch(() => {
-            wx.showToast({ title: '未开启相册权限', icon: 'none' })
+          .catch((error) => {
+            this.showSaveErrorToast(this.parseSaveErrorType(error))
           })
       })
       .catch(() => {

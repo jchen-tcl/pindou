@@ -11,6 +11,11 @@
     "backgroundColor": "#F6FBFF",
     "backgroundTextStyle": "light"
   },
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "用于将生成的效果图保存到相册"
+    }
+  },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }
