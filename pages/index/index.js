@@ -14,26 +14,30 @@ Page({
     })
   },
   chooseImage() {
-    this.pickImage(['album'])
-  },
-  takePhoto() {
-    this.pickImage(['camera'])
-  },
-  pickImage(sourceType) {
+    if (this.picking) return
+    this.picking = true
     wx.chooseImage({
       count: 1,
       sizeType: ['compressed'],
-      sourceType,
+      sourceType: ['album'],
       success: async (res) => {
         const path = res.tempFilePaths?.[0] || ''
         if (!path) {
+          this.picking = false
           return
         }
-        const safePath = await this.normalizeImage(path)
-        const finalPath = await this.tryCropImage(safePath, true)
-        this.saveImagePath(finalPath)
+        try {
+          const safePath = await this.normalizeImage(path)
+          this.saveImagePath(safePath)
+        } catch (error) {
+          wx.showToast({ title: '图片处理失败，请重试', icon: 'none' })
+        } finally {
+          this.picking = false
+        }
       },
-      fail: () => {
+      fail: (error) => {
+        this.picking = false
+        if (/cancel/.test(error.errMsg || '')) return
         wx.showToast({
           title: '图片选择失败，请重试',
           icon: 'none'
@@ -46,7 +50,8 @@ Page({
     const prev = app.globalData.taskData || {}
     app.globalData.taskData = {
       ...prev,
-      imagePath: path
+      imagePath: path,
+      plan: null
     }
     this.setData({ imagePath: path })
     wx.showToast({
@@ -54,93 +59,16 @@ Page({
       icon: 'none'
     })
   },
-  async tryCropImage(path, askConfirm = false) {
-    if (!path) {
-      return path
-    }
-    const info = await this.getImageInfoSafe(path)
-    if (!info?.width || !info?.height) {
-      return path
-    }
-    if (Math.abs(info.width - info.height) <= 2) {
-      return path
-    }
-    if (askConfirm) {
-      const confirmed = await this.confirmCrop()
-      if (!confirmed) {
-        return path
-      }
-    }
-    wx.showLoading({
-      title: '正在裁切',
-      mask: true
-    })
-    try {
-      return await this.cropToSquare(path)
-    } catch (error) {
-      return path
-    } finally {
-      wx.hideLoading()
-    }
-  },
-  confirmCrop() {
-    return new Promise((resolve) => {
-      wx.showModal({
-        title: '是否裁切',
-        content: '可将图片裁切为正方形，更适合拼豆预览',
-        confirmText: '裁切',
-        cancelText: '跳过',
-        success: (res) => resolve(!!res.confirm),
-        fail: () => resolve(false)
-      })
-    })
-  },
-  cropToSquare(path) {
-    return new Promise((resolve, reject) => {
-      wx.getImageInfo({
-        src: path,
-        success: (info) => {
-          const side = Math.min(info.width, info.height)
-          const sx = Math.floor((info.width - side) / 2)
-          const sy = Math.floor((info.height - side) / 2)
-          const exportSize = Math.min(side, 1200)
-          const ctx = wx.createCanvasContext('cropCanvas', this)
-          ctx.clearRect(0, 0, exportSize, exportSize)
-          ctx.drawImage(path, sx, sy, side, side, 0, 0, exportSize, exportSize)
-          ctx.draw(false, () => {
-            wx.canvasToTempFilePath(
-              {
-                canvasId: 'cropCanvas',
-                x: 0,
-                y: 0,
-                width: exportSize,
-                height: exportSize,
-                destWidth: exportSize,
-                destHeight: exportSize,
-                fileType: 'jpg',
-                quality: 0.95,
-                success: (res) => resolve(res.tempFilePath || path),
-                fail: reject
-              },
-              this
-            )
-          })
-        },
-        fail: reject
-      })
-    })
-  },
   async normalizeImage(path) {
     const ext = this.getExt(path)
     const formatExt = ['heic', 'heif', 'tiff', 'tif', 'bmp', 'webp']
     const needConvert = formatExt.includes(ext)
     const info = await this.getImageInfoSafe(path)
-    const compressedList = [
-      await this.compressImageSafe(path, 82),
-      await this.compressImageSafe(path, 60)
-    ]
-    for (let i = 0; i < compressedList.length; i += 1) {
-      const converted = compressedList[i]
+    if (info?.width && info?.height && !needConvert) {
+      return path
+    }
+    for (const quality of [82, 60]) {
+      const converted = await this.compressImageSafe(path, quality)
       if (!converted) {
         continue
       }
@@ -148,9 +76,6 @@ Page({
       if (convertedInfo?.width && convertedInfo?.height) {
         return converted
       }
-    }
-    if (info?.width && info?.height && !needConvert) {
-      return path
     }
     return path
   },
@@ -187,7 +112,11 @@ Page({
       return
     }
     wx.navigateTo({
-      url: '/pages/params/params'
+      url: '/pages/params/params',
+      fail: (error) => {
+        console.error('打开参数页失败', error)
+        wx.showToast({ title: '页面打开失败，请重新编译后重试', icon: 'none' })
+      }
     })
   }
 })

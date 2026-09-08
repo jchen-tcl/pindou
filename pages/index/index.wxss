@@ -67,13 +67,3 @@
   font-size: 24rpx;
   color: #9db2c6;
 }
-
-.crop-canvas {
-  position: fixed;
-  left: -9999px;
-  top: -9999px;
-  width: 1200px;
-  height: 1200px;
-  opacity: 0;
-  pointer-events: none;
-}

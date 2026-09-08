@@ -1,11 +1,5 @@
 const { generateBeadPlan } = require('../../utils/bead')
 
-const SIZE_OPTIONS = [
-  { label: '小号（入门）', value: 'small' },
-  { label: '中号（推荐）', value: 'medium' },
-  { label: '大号（进阶）', value: 'large' }
-]
-
 const GRID_OPTIONS = [
   { label: '32x32', value: '32x32' },
   { label: '48x48', value: '48x48' },
@@ -26,12 +20,11 @@ function getErrorMessage(error) {
 Page({
   data: {
     imagePath: '',
-    sizeOptions: SIZE_OPTIONS,
     gridOptions: GRID_OPTIONS,
-    size: 'medium',
+    sizeLabel: '约 24 × 24 cm（按 5 mm 间距估算）',
     grid: '48x48',
     colorCount: 16,
-    styleMode: 'cute'
+    paletteVersion: '221'
   },
   onLoad() {
     const app = getApp()
@@ -44,30 +37,32 @@ Page({
     }
     this.setData({
       imagePath: taskData.imagePath,
-      size: taskData.size || 'medium',
+      sizeLabel: this.getSizeLabel(taskData.grid || '48x48'),
       grid: taskData.grid || '48x48',
       colorCount: taskData.colorCount || 16,
-      styleMode: taskData.styleMode || 'cute'
+      paletteVersion: taskData.paletteVersion || '221'
     })
   },
-  setSize(e) {
-    this.setData({ size: e.currentTarget.dataset.value })
+  getSizeLabel(grid) {
+    const side = (Number(String(grid).split('x')[0]) || 48) * 0.5
+    return `约 ${side} × ${side} cm（按 5 mm 间距估算）`
   },
   setGrid(e) {
-    this.setData({ grid: e.currentTarget.dataset.value })
+    const grid = e.currentTarget.dataset.value
+    this.setData({ grid, sizeLabel: this.getSizeLabel(grid) })
   },
   setColorCount(e) {
     this.setData({ colorCount: Number(e.detail.value) })
   },
-  setStyleMode(e) {
-    this.setData({ styleMode: e.detail.value })
+  setPaletteVersion(e) {
+    this.setData({ paletteVersion: e.detail.value })
   },
   async startConvert() {
     if (this.converting) {
       return
     }
     this.converting = true
-    const sizeLabel = SIZE_OPTIONS.find((item) => item.value === this.data.size)?.label || '中号（推荐）'
+    const sizeLabel = this.getSizeLabel(this.data.grid)
     wx.showLoading({
       title: '正在转换',
       mask: true
@@ -77,17 +72,18 @@ Page({
         imagePath: this.data.imagePath,
         grid: this.data.grid,
         colorCount: this.data.colorCount,
-        styleMode: this.data.styleMode
+        styleMode: 'cute',
+        paletteVersion: this.data.paletteVersion
       })
       const app = getApp()
       const prev = app.globalData.taskData || {}
       app.globalData.taskData = {
         ...prev,
-        size: this.data.size,
         sizeLabel,
         grid: this.data.grid,
         colorCount: this.data.colorCount,
-        styleMode: this.data.styleMode,
+        styleMode: 'cute',
+        paletteVersion: plan.paletteVersion,
         plan
       }
       wx.showToast({

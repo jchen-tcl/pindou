@@ -1,9 +1,15 @@
 <view class="page">
   <view class="card section">
-    <view class="h">选择成品尺寸</view>
-    <view class="chips">
-      <view wx:for="{{sizeOptions}}" wx:key="value" class="chip {{size === item.value ? 'chip-active' : ''}}" data-value="{{item.value}}" bindtap="setSize">{{item.label}}</view>
-    </view>
+    <view class="h">MARD 色卡</view>
+    <radio-group bindchange="setPaletteVersion">
+      <label class="radio-item"><radio value="221" checked="{{paletteVersion==='221'}}" />221 色标准版</label>
+      <label class="radio-item"><radio value="291" checked="{{paletteVersion==='291'}}" />291 色完整版（含扩展色）</label>
+    </radio-group>
+    <view>按手头套装选择；屏幕颜色仅供参考。</view>
+  </view>
+  <view class="card section">
+    <view class="h">预计成品尺寸</view>
+    <view>{{sizeLabel}}</view>
   </view>
 
   <view class="card section">
@@ -14,26 +20,13 @@
   </view>
 
   <view class="card section">
-    <view class="h">颜色数量：{{colorCount}}色</view>
+    <view class="h">最多使用：{{colorCount}}色</view>
     <slider min="8" max="32" step="8" value="{{colorCount}}" activeColor="#ff8fbe" block-color="#ffd0e4" bindchange="setColorCount" />
-  </view>
-
-  <view class="card section">
-    <view class="h">风格强度</view>
-    <radio-group bindchange="setStyleMode">
-      <label class="radio-item">
-        <radio value="restore" checked="{{styleMode==='restore'}}" color="#ff8fbe" />
-        <text>还原优先</text>
-      </label>
-      <label class="radio-item">
-        <radio value="cute" checked="{{styleMode==='cute'}}" color="#ff8fbe" />
-        <text>可爱优化</text>
-      </label>
-    </radio-group>
   </view>
 
   <view class="card section preview-box">
     <view class="h">预览</view>
+    <view>保留整张图片，非正方形图片居中补浅色背景；背景计入用豆量。</view>
     <image src="{{imagePath}}" mode="aspectFit" class="preview" />
   </view>
 

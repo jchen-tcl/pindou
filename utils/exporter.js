@@ -1,13 +1,14 @@
 function buildPrintText(taskData) {
   const lines = []
   lines.push('拼豆转换器 - 亲子手作清单')
+  lines.push(`色卡：MARD ${taskData.plan.paletteVersion || '221'} 色`)
   lines.push(`成品尺寸：${taskData.sizeLabel}`)
   lines.push(`拼豆网格：${taskData.grid}`)
-  lines.push(`颜色数量：${taskData.colorCount}色`)
+  lines.push(`颜色数量：${taskData.plan.detail.length}色`)
   lines.push(`总颗粒数：${taskData.plan.total}`)
   lines.push('------------------------')
   taskData.plan.detail.forEach((item, index) => {
-    lines.push(`${index + 1}. ${item.name} ${item.code}：${item.count}颗`)
+    lines.push(`${item.beadCode || String(item.colorIndex || index + 1).padStart(2, '0')}. ${item.name} ${item.code}：${item.count}颗`)
   })
   lines.push('------------------------')
   lines.push('制作小贴士：先从边缘颜色开始更容易完成。')
@@ -21,7 +22,7 @@ function buildExcelXml(taskData) {
   const effectRows = buildEffectRows(matrix, false)
   const columnCount = matrix[0]?.length || 1
   worksheets.push(buildWorksheet('效果图', effectRows, columnCount, 12))
-  const effectCodeRows = buildEffectRows(matrix, true)
+  const effectCodeRows = buildEffectRows(matrix, true, detail)
   worksheets.push(buildWorksheet('效果图+色号', effectCodeRows, columnCount, 12))
   const statRows = buildStatsRows(detail, taskData.plan?.total || 0)
   worksheets.push(buildWorksheet('拼豆统计', statRows, 6, [12, 16, 28, 20, 14, 14], { rowHeight: 24 }))
@@ -44,6 +45,7 @@ function buildXlsxBuffer(taskData) {
   const rows1 = buildXlsxEffectRows(matrix, styleContext)
   const rows2 = buildXlsxEffectCodeRows(matrix, styleContext)
   const rows3 = buildXlsxStatsRows(detail, taskData.plan?.total || 0, styleContext)
+  rows3[0][0] = `MARD ${taskData.plan?.paletteVersion || '221'} 色 · 拼豆颜色数量统计`
   const squareCellPx = 18
   const squareOptions = {
     squareCells: true,
@@ -51,7 +53,11 @@ function buildXlsxBuffer(taskData) {
     columnWidth: toExcelColumnWidth(squareCellPx)
   }
   const sheet1 = buildSheetXml(rows1, squareOptions)
-  const sheet2 = buildSheetXml(rows2, squareOptions)
+  const sheet2 = buildSheetXml(rows2, {
+    squareCells: true,
+    rowHeight: toExcelRowHeight(36),
+    columnWidth: toExcelColumnWidth(36)
+  })
   const sheet3 = buildSheetXml(rows3)
   const styles = styleContext.stylesXml
   const workbook = buildWorkbookXml(['效果图', '效果图+色号', '拼豆统计'])
@@ -105,13 +111,13 @@ function buildCellXml(cell) {
   return `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`
 }
 
-function buildEffectRows(matrix, withCode) {
+function buildEffectRows(matrix, withCode, detail = []) {
   if (!matrix.length) {
     return [[{ value: '', styleId: 'blank' }]]
   }
   return matrix.map((line) =>
     line.map((colorIndex) => ({
-      value: withCode && colorIndex ? String(colorIndex).padStart(2, '0') : '',
+      value: withCode && colorIndex ? (detail.find(item => item.colorIndex === colorIndex)?.beadCode || String(colorIndex)) : '',
       styleId: colorIndex ? toColorStyleId(colorIndex) : 'blank'
     }))
   )
@@ -143,7 +149,7 @@ function buildXlsxEffectCodeRows(matrix, styleContext) {
         return ''
       }
       return {
-        value: String(n).padStart(2, '0'),
+        value: styleContext.labelByColorIndex[n] || String(n),
         style: styleContext.styleByColorIndex[n] || 0
       }
     })
@@ -167,7 +173,7 @@ function buildStatsRows(detail, total) {
     const colorIndex = Number(item.colorIndex || index + 1)
     rows.push([
       { value: `${index + 1}`, styleId: 'statNum' },
-      { value: `${colorIndex}`, styleId: 'statNum' },
+      { value: item.beadCode || `${colorIndex}`, styleId: 'statNum' },
       { value: item.name || '', styleId: 'statCell' },
       { value: item.code || '', styleId: 'statCell' },
       { value: `${item.count || 0}`, styleId: 'statNum' },
@@ -202,7 +208,7 @@ function buildXlsxStatsRows(detail, total, styleContext) {
     const colorIndex = Number(item.colorIndex || index + 1)
     rows.push([
       index + 1,
-      colorIndex,
+      item.beadCode || colorIndex,
       item.name || '',
       item.code || '',
       Number(item.count || 0),
@@ -491,6 +497,7 @@ function createXlsxStyleContext(detail) {
     })
     .filter(Boolean)
     .sort((a, b) => a.colorIndex - b.colorIndex)
+  const labelByColorIndex = Object.fromEntries(detail.map(item => [item.colorIndex, item.beadCode || String(item.colorIndex)]))
   const styleByColorIndex = {}
   colorRows.forEach((item, index) => {
     styleByColorIndex[item.colorIndex] = index + 2
@@ -526,6 +533,7 @@ function createXlsxStyleContext(detail) {
 </styleSheet>`
   return {
     styleByColorIndex,
+    labelByColorIndex,
     stylesXml
   }
 }

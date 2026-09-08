@@ -15,6 +15,7 @@
 
   <view class="card stats">
     <view class="h">制作信息</view>
+    <view class="line">色卡：MARD {{paletteVersion}} 色</view>
     <view class="line">成品尺寸：{{sizeLabel}}</view>
     <view class="line">拼豆网格：{{grid}}</view>
     <view class="line">颜色数量：{{colorCount}}色</view>
@@ -25,7 +26,7 @@
     <view class="h">颜色用量清单</view>
     <view class="row" wx:for="{{detail}}" wx:key="code">
       <view class="dot" style="background: {{item.code}};"></view>
-      <view class="name">{{item.name}} ({{item.code}})</view>
+      <view class="name">{{item.colorLabel}} ({{item.code}})</view>
       <view class="count">{{item.count}}颗</view>
     </view>
   </view>

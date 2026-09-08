@@ -1,9 +1,10 @@
-const { buildPrintText, buildXlsxBuffer, saveFile, saveBinaryFile } = require('../../utils/exporter')
+const { buildXlsxBuffer, saveBinaryFile } = require('../../utils/exporter')
 
 Page({
   data: {
     imagePath: '',
     sizeLabel: '',
+    paletteVersion: '221',
     grid: '',
     colorCount: 16,
     total: 0,
@@ -24,15 +25,18 @@ Page({
     this.setData({
       imagePath: taskData.imagePath,
       sizeLabel: taskData.sizeLabel,
+      paletteVersion: taskData.plan.paletteVersion || taskData.paletteVersion || '221',
       grid: taskData.grid,
-      colorCount: taskData.colorCount,
+      colorCount: taskData.plan.detail.length,
       total: taskData.plan.total,
-      detail: taskData.plan.detail
+      detail: taskData.plan.detail.map((item) => ({
+        ...item,
+        colorLabel: item.beadCode || String(item.colorIndex).padStart(2, '0')
+      }))
     })
-    this.syncPreviewRatio(taskData.imagePath)
   },
   onReady() {
-    this.renderEffectImage()
+    this.renderEffectImage().catch(() => {})
   },
   switchPreview(e) {
     const mode = e.currentTarget.dataset.mode
@@ -42,17 +46,33 @@ Page({
     this.setData({ previewMode: mode }, () => {
       if (mode === 'effect' && !this.effectImagePath) {
         setTimeout(() => {
-          this.renderEffectImage()
+          this.renderEffectImage().catch(() => {})
         }, 50)
       }
       if (mode === 'effect_code' && !this.effectCodeImagePath) {
         setTimeout(() => {
-          this.renderEffectCodeImage()
+          this.renderEffectCodeImage().catch(() => {})
         }, 50)
       }
     })
   },
-  async renderEffectImage() {
+  renderEffectImage() {
+    if (!this.effectRenderPromise) {
+      this.effectRenderPromise = this.drawEffectImage().finally(() => {
+        this.effectRenderPromise = null
+      })
+    }
+    return this.effectRenderPromise
+  },
+  renderEffectCodeImage() {
+    if (!this.codeRenderPromise) {
+      this.codeRenderPromise = this.drawEffectCodeImage().finally(() => {
+        this.codeRenderPromise = null
+      })
+    }
+    return this.codeRenderPromise
+  },
+  async drawEffectImage() {
     const matrix = this.taskData?.plan?.matrix || []
     if (!matrix.length) {
       return
@@ -99,7 +119,7 @@ Page({
       throw error
     }
   },
-  async renderEffectCodeImage() {
+  async drawEffectCodeImage() {
     const matrix = this.taskData?.plan?.matrix || []
     if (!matrix.length) {
       return
@@ -123,8 +143,8 @@ Page({
           ctx.fillRect(draw.left + col * cell, draw.top + row * cell, cell, cell)
           if (colorIndex > 0) {
             ctx.fillStyle = this.getTextColorByBg(color)
-            ctx.font = `${Math.max(8, Math.floor(cell * 0.45))}px sans-serif`
-            ctx.fillText(String(colorIndex).padStart(2, '0'), draw.left + col * cell + cell / 2, draw.top + row * cell + cell / 2)
+            ctx.font = `${Math.max(3, cell * 0.28)}px sans-serif`
+            ctx.fillText((this.taskData.plan.detail.find(item => item.colorIndex === colorIndex)?.beadCode || String(colorIndex)), draw.left + col * cell + cell / 2, draw.top + row * cell + cell / 2, cell * 0.9)
           }
         }
       }
@@ -241,20 +261,6 @@ Page({
     const left = (width - size) / 2
     const top = (height - size) / 2
     return { left, top, size }
-  },
-  syncPreviewRatio(imagePath) {
-    wx.getImageInfo({
-      src: imagePath,
-      success: (res) => {
-        if (!res?.width || !res?.height) {
-          return
-        }
-        const padding = Number(((res.height / res.width) * 100).toFixed(2))
-        this.setData({
-          previewPadding: padding
-        })
-      }
-    })
   },
   parseSaveErrorType(error) {
     const errMsg = String(error?.errMsg || error?.message || '').toLowerCase()
@@ -383,7 +389,7 @@ Page({
               })
             return
           }
-          if (type === 'permission_denied') {
+          if (type === 'permission_denied' && retryCount < 1) {
             this.ensureAlbumPermission()
               .then(() => {
                 save(filePath, retryCount + 1)
@@ -421,30 +427,16 @@ Page({
     }
     try {
       const xlsxBuffer = buildXlsxBuffer(this.taskData)
-      const path = saveBinaryFile(`effect_${Date.now()}.xlsx`, xlsxBuffer)
+      const path = saveBinaryFile('effect_current.xlsx', xlsxBuffer)
       wx.openDocument({
         filePath: path,
         showMenu: true,
         fileType: 'xlsx',
         fail: () => {
-          try {
-            const text = buildPrintText(this.taskData)
-            const txtPath = saveFile(`effect_${Date.now()}.txt`, text)
-            wx.openDocument({
-              filePath: txtPath,
-              showMenu: true,
-              fileType: 'txt'
-            })
-            wx.showToast({
-              title: 'Excel预览失败，已切换文本清单',
-              icon: 'none'
-            })
-          } catch (error) {
-            wx.showToast({
-              title: '文件预览失败，请稍后重试',
-              icon: 'none'
-            })
-          }
+          wx.showToast({
+            title: 'Excel预览失败，请稍后重试',
+            icon: 'none'
+          })
         }
       })
     } catch (error) {

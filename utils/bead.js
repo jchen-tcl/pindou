@@ -1,4 +1,6 @@
-const { PALETTE } = require('./colors')
+const { getPalette } = require('./colors')
+const { quantize, normalizeStyle } = require('./quantize')
+const { cleanAssignments } = require('./cleanup')
 
 const GRID_TO_TOTAL = {
   '32x32': 1024,
@@ -6,18 +8,22 @@ const GRID_TO_TOTAL = {
   '64x64': 4096
 }
 
-async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'cute', cropRatio = '1:1' }) {
+async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'cute', cropRatio = 'contain', paletteVersion = '221' }) {
+  const PALETTE = getPalette(paletteVersion)
+  if (!GRID_TO_TOTAL[grid]) grid = '48x48'
   const total = GRID_TO_TOTAL[grid] || 2304
   const gridSize = Number(String(grid).split('x')[0]) || 48
-  const safeColorCount = Math.max(1, Math.min(Number(colorCount) || 16, PALETTE.length))
-  const colors = PALETTE.slice(0, safeColorCount).map((item, index) => ({
+  const safeColorCount = Math.max(1, Math.min(Math.floor(Number(colorCount) || 16), PALETTE.length))
+  const palette = PALETTE.map((item, index) => ({
     ...item,
     index,
     rgb: hexToRgb(item.code)
   }))
-  const resolveNearestColor = createNearestColorResolver(colors)
   const imageInfo = await getImageInfoSafe(imagePath)
-  const pixelList = await samplePixels(imagePath, imageInfo, gridSize, cropRatio)
+  const pixelList = (await samplePixels(imagePath, imageInfo, gridSize, cropRatio))
+    .map(([r, g, b]) => normalizeStyle(r, g, b, styleMode))
+  const mapped = quantize(pixelList, palette, safeColorCount)
+  const assignments = styleMode === 'clean' ? cleanAssignments(mapped, gridSize) : mapped
   const countMap = new Map()
   const cellsByColor = {}
   const matrix = new Array(gridSize)
@@ -25,9 +31,7 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     const rowColors = new Array(gridSize)
     for (let col = 0; col < gridSize; col += 1) {
       const i = row * gridSize + col
-      const [r, g, b] = pixelList[i] || [255, 255, 255]
-      const [sr, sg, sb] = normalizeStyle(r, g, b, styleMode)
-      const color = resolveNearestColor(sr, sg, sb)
+      const color = assignments[i]
       countMap.set(color.index, (countMap.get(color.index) || 0) + 1)
       if (!cellsByColor[color.index]) {
         cellsByColor[color.index] = []
@@ -37,10 +41,11 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     }
     matrix[row] = rowColors
   }
-  const detail = colors
+  const detail = palette
     .filter((item) => countMap.has(item.index))
     .map((item) => ({
       name: item.name,
+      beadCode: item.id,
       code: item.code,
       count: countMap.get(item.index),
       colorIndex: item.index + 1
@@ -48,6 +53,7 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     .sort((a, b) => b.count - a.count)
   return {
     total,
+    paletteVersion: String(paletteVersion) === '291' ? '291' : '221',
     detail,
     matrix,
     gridSize,
@@ -67,15 +73,12 @@ function getImageInfo(src) {
 
 async function samplePixels(imagePath, imageInfo, gridSize, cropRatio) {
   const { canvas, ctx } = createSamplingCanvas(gridSize)
-  const candidatePaths = await buildCandidatePaths(imagePath)
-  let rendered = false
-  for (let i = 0; i < candidatePaths.length; i += 1) {
-    const path = candidatePaths[i]
-    const info = path === imagePath ? (imageInfo || await getImageInfoSafe(path)) : await getImageInfoSafe(path)
-    rendered = await tryRenderPath(canvas, ctx, path, info, gridSize, cropRatio)
-    if (rendered) {
-      break
-    }
+  let rendered = await tryRenderPath(canvas, ctx, imagePath, imageInfo, gridSize, cropRatio)
+  for (const quality of [82, 60]) {
+    if (rendered) break
+    const path = await transcodeImage(imagePath, quality)
+    if (path === imagePath) continue
+    rendered = await tryRenderPath(canvas, ctx, path, await getImageInfoSafe(path), gridSize, cropRatio)
   }
   if (!rendered) {
     throw new Error('IMAGE_DECODE_FAILED')
@@ -100,8 +103,13 @@ function createSamplingCanvas(gridSize) {
     canvas = null
   }
   if (!canvas) {
-    canvas = wx.createOffscreenCanvas()
+    try {
+      canvas = wx.createOffscreenCanvas()
+    } catch (error) {
+      throw new Error('CANVAS_CONTEXT_FAILED')
+    }
   }
+  if (!canvas) throw new Error('CANVAS_CONTEXT_FAILED')
   canvas.width = gridSize
   canvas.height = gridSize
   const ctx = canvas.getContext('2d')
@@ -109,19 +117,6 @@ function createSamplingCanvas(gridSize) {
     throw new Error('CANVAS_CONTEXT_FAILED')
   }
   return { canvas, ctx }
-}
-
-async function buildCandidatePaths(imagePath) {
-  const list = [imagePath]
-  const p82 = await transcodeImage(imagePath, 82)
-  if (p82) {
-    list.push(p82)
-  }
-  const p60 = await transcodeImage(p82 || imagePath, 60)
-  if (p60) {
-    list.push(p60)
-  }
-  return Array.from(new Set(list))
 }
 
 async function tryRenderPath(canvas, ctx, imagePath, imageInfo, gridSize, cropRatio) {
@@ -155,8 +150,19 @@ function hasPixels(ctx, gridSize) {
 function drawByImageInfo(ctx, imagePath, imageInfo, gridSize, cropRatio) {
   const sw = imageInfo.width
   const sh = imageInfo.height
+  drawImageToGrid(ctx, imagePath, sw, sh, gridSize, cropRatio)
+}
+
+function drawImageToGrid(ctx, image, sw, sh, gridSize, cropRatio) {
+  if (cropRatio === 'contain') {
+    const scale = gridSize / Math.max(sw, sh)
+    const width = sw * scale
+    const height = sh * scale
+    ctx.drawImage(image, 0, 0, sw, sh, (gridSize - width) / 2, (gridSize - height) / 2, width, height)
+    return
+  }
   const rect = getCropRect(sw, sh, cropRatio)
-  ctx.drawImage(imagePath, rect.sx, rect.sy, rect.sWidth, rect.sHeight, 0, 0, gridSize, gridSize)
+  ctx.drawImage(image, rect.sx, rect.sy, rect.sWidth, rect.sHeight, 0, 0, gridSize, gridSize)
 }
 
 function drawByDecoder(canvas, ctx, imagePath, gridSize, cropRatio) {
@@ -168,11 +174,12 @@ function drawByDecoder(canvas, ctx, imagePath, gridSize, cropRatio) {
       }
       const image = canvas.createImage()
       image.onload = () => {
-        const sw = image.width
-        const sh = image.height
-        const rect = getCropRect(sw, sh, cropRatio)
-        ctx.drawImage(image, rect.sx, rect.sy, rect.sWidth, rect.sHeight, 0, 0, gridSize, gridSize)
-        resolve()
+        try {
+          drawImageToGrid(ctx, image, image.width, image.height, gridSize, cropRatio)
+          resolve()
+        } catch (error) {
+          reject(error)
+        }
       }
       image.onerror = reject
       image.src = imagePath
@@ -224,50 +231,6 @@ async function getImageInfoSafe(src) {
     return await getImageInfo(src)
   } catch (error) {
     return null
-  }
-}
-
-function normalizeStyle(r, g, b, styleMode) {
-  if (styleMode !== 'cute') {
-    return [r, g, b]
-  }
-  const bright = 0.16
-  const softenedR = Math.round(r + (255 - r) * bright)
-  const softenedG = Math.round(g + (255 - g) * bright)
-  const softenedB = Math.round(b + (255 - b) * bright)
-  return [softenedR, softenedG, softenedB]
-}
-
-function nearestColor(r, g, b, colors) {
-  let best = colors[0]
-  let minDistance = Number.MAX_SAFE_INTEGER
-  for (let i = 0; i < colors.length; i += 1) {
-    const color = colors[i]
-    const dr = r - color.rgb[0]
-    const dg = g - color.rgb[1]
-    const db = b - color.rgb[2]
-    const distance = dr * dr * 0.3 + dg * dg * 0.59 + db * db * 0.11
-    if (distance < minDistance) {
-      minDistance = distance
-      best = color
-    }
-  }
-  return best
-}
-
-function createNearestColorResolver(colors) {
-  const cache = new Map()
-  return (r, g, b) => {
-    const qr = r >> 3
-    const qg = g >> 3
-    const qb = b >> 3
-    const key = `${qr}_${qg}_${qb}`
-    if (cache.has(key)) {
-      return cache.get(key)
-    }
-    const color = nearestColor(r, g, b, colors)
-    cache.set(key, color)
-    return color
   }
 }
 
