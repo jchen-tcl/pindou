@@ -5,7 +5,8 @@ const { cleanAssignments } = require('./cleanup')
 const GRID_TO_TOTAL = {
   '32x32': 1024,
   '48x48': 2304,
-  '64x64': 4096
+  '64x64': 4096,
+  '128x128': 16384
 }
 
 async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'cute', cropRatio = 'contain', paletteVersion = '221' }) {

@@ -78,9 +78,10 @@ test('compression starts only after decoding fails and stops at first success', 
 
 test('color limit and matrix statistics remain consistent across all grids', async () => {
   const colors = PALETTE.map(c => c.code.slice(1).match(/../g).map(v => parseInt(v, 16)))
-  for (const grid of ['32x32', '48x48', '64x64']) {
+  for (const grid of ['32x32', '48x48', '64x64', '128x128']) {
     mockImage({ colors })
     const plan = await convert({ grid, colorCount: 8 })
+    assert.equal(plan.gridSize, Number(grid.split('x')[0]))
     assert.ok(plan.detail.length <= 8)
     const counts = new Map()
     plan.matrix.flat().forEach(i => counts.set(i, (counts.get(i) || 0) + 1))
@@ -128,6 +129,7 @@ test('estimated dimensions follow grid selection', () => {
   require('../pages/params/params')
   assert.match(page.getSizeLabel('32x32'), /16 × 16 cm/)
   assert.match(page.getSizeLabel('64x64'), /32 × 32 cm/)
+  assert.match(page.getSizeLabel('128x128'), /64 × 64 cm/)
 })
 
 test('concurrent preview requests share rendering and failures allow retry', async () => {

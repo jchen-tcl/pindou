@@ -3,8 +3,19 @@ const { generateBeadPlan } = require('../../utils/bead')
 const GRID_OPTIONS = [
   { label: '32x32', value: '32x32' },
   { label: '48x48', value: '48x48' },
-  { label: '64x64', value: '64x64' }
+  { label: '64x64', value: '64x64' },
+  { label: '128x128', value: '128x128' }
 ]
+
+function paletteSettings(version, count) {
+  const paletteVersion = String(version) === '291' ? '291' : '221'
+  const maxColorCount = Number(paletteVersion)
+  return {
+    paletteVersion,
+    maxColorCount,
+    colorCount: Math.max(8, Math.min(maxColorCount, Math.floor(Number(count) || 16)))
+  }
+}
 
 function getErrorMessage(error) {
   const code = error?.message
@@ -24,6 +35,7 @@ Page({
     sizeLabel: '约 24 × 24 cm（按 5 mm 间距估算）',
     grid: '48x48',
     colorCount: 16,
+    maxColorCount: 221,
     paletteVersion: '221'
   },
   onLoad() {
@@ -39,8 +51,7 @@ Page({
       imagePath: taskData.imagePath,
       sizeLabel: this.getSizeLabel(taskData.grid || '48x48'),
       grid: taskData.grid || '48x48',
-      colorCount: taskData.colorCount || 16,
-      paletteVersion: taskData.paletteVersion || '221'
+      ...paletteSettings(taskData.paletteVersion, taskData.colorCount)
     })
   },
   getSizeLabel(grid) {
@@ -52,10 +63,10 @@ Page({
     this.setData({ grid, sizeLabel: this.getSizeLabel(grid) })
   },
   setColorCount(e) {
-    this.setData({ colorCount: Number(e.detail.value) })
+    this.setData(paletteSettings(this.data.paletteVersion, e.detail.value))
   },
   setPaletteVersion(e) {
-    this.setData({ paletteVersion: e.detail.value })
+    this.setData(paletteSettings(e.detail.value, this.data.colorCount))
   },
   async startConvert() {
     if (this.converting) {

@@ -21,7 +21,7 @@
 
   <view class="card section">
     <view class="h">最多使用：{{colorCount}}色</view>
-    <slider min="8" max="32" step="8" value="{{colorCount}}" activeColor="#ff8fbe" block-color="#ffd0e4" bindchange="setColorCount" />
+    <slider min="8" max="{{maxColorCount}}" step="1" value="{{colorCount}}" activeColor="#ff8fbe" block-color="#ffd0e4" bindchange="setColorCount" />
   </view>
 
   <view class="card section preview-box">
