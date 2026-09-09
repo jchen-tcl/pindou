@@ -42,8 +42,6 @@ function buildXlsxBuffer(taskData) {
   const matrix = taskData.plan?.matrix || []
   const detail = taskData.plan?.detail || []
   const styleContext = createXlsxStyleContext(detail)
-  const rows1 = buildXlsxEffectRows(matrix, styleContext)
-  const rows2 = buildXlsxEffectCodeRows(matrix, styleContext)
   const rows3 = buildXlsxStatsRows(detail, taskData.plan?.total || 0, styleContext)
   rows3[0][0] = `MARD ${taskData.plan?.paletteVersion || '221'} 色 · 拼豆颜色数量统计`
   const squareCellPx = 18
@@ -52,8 +50,11 @@ function buildXlsxBuffer(taskData) {
     rowHeight: toExcelRowHeight(squareCellPx),
     columnWidth: toExcelColumnWidth(squareCellPx)
   }
-  const sheet1 = buildSheetXml(rows1, squareOptions)
-  const sheet2 = buildSheetXml(rows2, {
+  // Convert one row at a time instead of retaining two million cell objects.
+  const sheet1 = buildSheetXml(matrix, { ...squareOptions,
+    mapRow: line => buildXlsxEffectRows([line], styleContext)[0] })
+  const sheet2 = buildSheetXml(matrix, {
+    mapRow: line => buildXlsxEffectCodeRows([line], styleContext)[0],
     squareCells: true,
     rowHeight: toExcelRowHeight(36),
     columnWidth: toExcelColumnWidth(36)
@@ -441,7 +442,7 @@ function buildSheetXml(rows, options = {}) {
   const colsXml = squareCells ? `<cols><col min="1" max="${maxCols}" width="${columnWidth}" customWidth="1"/></cols>` : ''
   const rowXml = rows
     .map((row, rowIndex) => {
-      const cells = row
+      const cells = (options.mapRow ? options.mapRow(row) : row)
         .map((value, colIndex) => buildXlsxCell(value, rowIndex + 1, colIndex + 1))
         .filter(Boolean)
         .join('')
@@ -583,7 +584,17 @@ function toExcelColumnWidth(pixel) {
 
 function utf8Bytes(input) {
   const text = String(input || '')
-  const bytes = []
+  let length = 0
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length &&
+        text.charCodeAt(i + 1) >= 0xdc00 && text.charCodeAt(i + 1) <= 0xdfff) {
+      length += 4
+      i++
+    } else length += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
   for (let i = 0; i < text.length; i += 1) {
     let code = text.charCodeAt(i)
     if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
@@ -594,16 +605,22 @@ function utf8Bytes(input) {
       }
     }
     if (code <= 0x7f) {
-      bytes.push(code)
+      bytes[offset++] = code
     } else if (code <= 0x7ff) {
-      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f))
+      bytes[offset++] = 0xc0 | (code >> 6)
+      bytes[offset++] = 0x80 | (code & 0x3f)
     } else if (code <= 0xffff) {
-      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f))
+      bytes[offset++] = 0xe0 | (code >> 12)
+      bytes[offset++] = 0x80 | ((code >> 6) & 0x3f)
+      bytes[offset++] = 0x80 | (code & 0x3f)
     } else {
-      bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f))
+      bytes[offset++] = 0xf0 | (code >> 18)
+      bytes[offset++] = 0x80 | ((code >> 12) & 0x3f)
+      bytes[offset++] = 0x80 | ((code >> 6) & 0x3f)
+      bytes[offset++] = 0x80 | (code & 0x3f)
     }
   }
-  return new Uint8Array(bytes)
+  return bytes
 }
 
 function buildZip(entries) {

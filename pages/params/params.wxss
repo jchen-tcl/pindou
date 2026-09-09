@@ -54,3 +54,7 @@
 .next {
   margin-top: 20rpx;
 }
+
+.custom-grid, .grid-hint { margin-top: 16rpx; }
+.custom-grid input { border: 2rpx solid #c8def3; border-radius: 12rpx; padding: 16rpx; margin-bottom: 12rpx; }
+.grid-hint { color: #5f748a; font-size: 24rpx; }

@@ -11,6 +11,7 @@
       <canvas type="2d" id="effectCanvas" class="preview-node effect-canvas" hidden="{{previewMode !== 'effect'}}"></canvas>
       <canvas type="2d" id="effectCodeCanvas" class="preview-node effect-canvas" hidden="{{previewMode !== 'effect_code'}}"></canvas>
     </view>
+    <view wx:if="{{total > 16384}}">大图预览缩小显示，完整格数与色号请导出 Excel 查看。</view>
   </view>
 
   <view class="card stats">

@@ -21,7 +21,7 @@ function xmlParts(buffer) {
 }
 
 test('both exported grids have equal physical width and height at every supported size', () => {
-  for (const grid of [32, 48, 64, 128]) {
+  for (const grid of [32, 48, 64, 128, 256, 512, 777, 1000]) {
     const parts = xmlParts(buildXlsxBuffer({ plan: {
       matrix: Array.from({ length: grid }, () => Array(grid).fill(1)), total: grid * grid,
       detail: [{ colorIndex: 1, beadCode: 'H7', code: '#000000', name: 'MARD H7', count: grid * grid }]
@@ -34,6 +34,8 @@ test('both exported grids have equal physical width and height at every supporte
     assert.match(fonts[2], /<sz val="10"\/>/)
     for (const sheet of [1, 2]) {
       const xml = parts[`xl/worksheets/sheet${sheet}.xml`]
+      assert.equal((xml.match(/<c /g) || []).length, grid * grid)
+      if (grid === 1000) assert.match(xml, /<dimension ref="A1:ALL1000"/)
       assert.match(xml, /<sheetViews><sheetView workbookViewId="0" zoomScale="100" zoomScaleNormal="100"\/><\/sheetViews>/)
       const width = Number(xml.match(/<col [^>]*width="([^"]+)"/)[1])
       // OOXML's specified reverse conversion with Calibri 12's 8 px digit width.

@@ -6,6 +6,35 @@ const white = [255, 255, 255], black = [0, 0, 0]
 const blue = [120, 164, 180], pink = [250, 185, 205]
 const palette = [white, black, blue, pink].map((rgb, index) => ({ rgb, index }))
 const key = rgb => rgb.join(',')
+
+test('pastel body fills remain distinct from white at every grid and palette size', () => {
+  const { getPalette } = require('../utils/colors')
+  for (const grid of [32, 48, 64, 128]) {
+    const width = grid * 3
+    for (const version of ['221', '291']) {
+      const beads = getPalette(version).map((c, index) => ({ ...c, index,
+        rgb: c.code.slice(1).match(/../g).map(v => parseInt(v, 16)) }))
+      const cream = beads.find(c => c.id === 'A1')
+      const pixels = Array(width * width).fill(white)
+      block(pixels, width, grid, grid, grid, cream.rgb)
+      const result = quantizeFlat(pixels, width, grid, beads, 16)
+      assert.equal(result[Math.floor(grid / 2) * grid + Math.floor(grid / 2)].id, 'A1')
+      assert.equal(result[0].id, 'H2')
+    }
+  }
+})
+
+test('light pink and blue fills survive while near-white noise still merges', () => {
+  for (const pastel of [[255, 220, 230], [210, 240, 255]]) {
+    const pixels = Array(60 * 60).fill(white)
+    block(pixels, 60, 20, 20, 20, pastel)
+    block(pixels, 60, 2, 2, 6, [251, 252, 249])
+    const result = flattenColors(pixels, 60)
+    assert.equal(key(result[30 * 60 + 30]), key(pastel))
+    assert.equal(key(result[3 * 60 + 3]), key(white))
+    assert.equal(new Set(result.map(key)).size, 2)
+  }
+})
 function block(pixels, width, x, y, size, rgb) {
   for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) {
     pixels[(y + dy) * width + x + dx] = rgb

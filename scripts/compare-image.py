@@ -1,6 +1,6 @@
 """Local algorithm comparison using Pillow sampling (not a WeChat Canvas emulator).
 
-Usage: python scripts/compare-image.py input.webp output_directory
+Usage: python scripts/compare-image.py input.webp output_directory [grid ...]
 Requires Pillow and node on PATH. The source image is read only.
 """
 import json
@@ -24,7 +24,7 @@ const input = JSON.parse(fs.readFileSync(0,'utf8'));
 const start = performance.now();
 const before = quantize(input.small.map(rgb => normalizeStyle(...rgb,'cute')), palette,16);
 const middle = performance.now();
-const after = quantizeFlat(input.large,input.grid*3,input.grid,palette,16);
+const after = quantizeFlat(input.large,input.sampleSize,input.grid,palette,16);
 const end = performance.now();
 process.stdout.write(JSON.stringify({ before: before.map(c=>c.rgb),after: after.map(c=>c.rgb),
   beforeColors: [...new Set(before.map(c=>c.id))],afterColors: [...new Set(after.map(c=>c.id))],
@@ -39,8 +39,11 @@ def sample(size):
     return list(rgb.get_flattened_data() if hasattr(rgb, 'get_flattened_data') else rgb.getdata())
 
 report = []
-for grid in [32, 48, 64, 128]:
-    data = dict(grid=grid, small=sample(grid), large=sample(grid*3))
+for grid in ([int(value) for value in sys.argv[3:]] or [32, 48, 64, 128]):
+    if not 1 <= grid <= 1000:
+        raise ValueError('Grid must be between 1 and 1000')
+    sample_size = grid * min(3, 1000 // grid)
+    data = dict(grid=grid, sampleSize=sample_size, small=sample(grid), large=sample(sample_size))
     result = json.loads(subprocess.run(['node', '-e', runner], input=json.dumps(data),
                         text=True, capture_output=True, check=True, cwd=root).stdout)
     comparison = Image.new('RGB', (1120, 600), '#eef1f5')

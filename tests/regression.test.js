@@ -44,6 +44,22 @@ const convert = (options = {}) => generateBeadPlan({
   imagePath: 'original', grid: '32x32', colorCount: 16, styleMode: 'restore', ...options
 })
 
+test('large and custom clean plans retain every cell and correct totals', async () => {
+  for (const size of [256, 512, 777, 1000]) {
+    mockImage({ width: 200, height: 100, colors: [[249, 240, 205]] })
+    const plan = await generateBeadPlan({ imagePath: 'original', grid: `${size}x${size}` })
+    assert.equal(plan.gridSize, size)
+    assert.equal(plan.total, size * size)
+    assert.equal(plan.matrix.length, size)
+    assert.ok(plan.matrix.every(row => row.length === size))
+    assert.equal(plan.detail.reduce((sum, c) => sum + c.count, 0), size * size)
+    assert.ok(plan.detail.some(c => c.beadCode === 'A1'))
+    assert.ok(plan.detail.some(c => c.beadCode === 'H2'))
+    assert.ok(plan.diagnostics.sampleSize <= 1000)
+  }
+  await assert.rejects(generateBeadPlan({ imagePath: 'original', grid: '1001x1001' }), /INVALID_GRID_SIZE/)
+})
+
 test('default palette keeps exact black and avoids unnecessary compression', async () => {
   const calls = mockImage()
   const plan = await convert()
@@ -161,7 +177,7 @@ test('default conversion supersamples without brightening and keeps full image b
   const restore = await convert()
   assert.deepEqual(clean.detail, restore.detail)
   assert.equal(clean.matrix.flat().length, 1024)
-  assert.equal(clean.algorithmVersion, 'flat-v2')
+  assert.equal(clean.algorithmVersion, 'flat-v3')
   assert.equal(clean.diagnostics.sampleSize, 96)
   assert.equal(clean.diagnostics.anchorColorCount, 2)
   assert.equal(clean.diagnostics.flatFallback, false)

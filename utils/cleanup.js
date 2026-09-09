@@ -5,7 +5,10 @@ const { toOklab, distance } = require('./quantize')
 function cleanAssignments(colors, width) {
   const output = colors.slice()
   const visited = new Uint8Array(colors.length)
-  const labs = new Map(colors.map(c => [c.index, toOklab(c.rgb)]))
+  const labs = new Map()
+  for (const color of colors) {
+    if (!labs.has(color.index)) labs.set(color.index, toOklab(color.rgb))
+  }
   const height = colors.length / width
   const neighbors = i => {
     const x = i % width, y = Math.floor(i / width)

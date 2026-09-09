@@ -16,8 +16,14 @@
   <view class="card section">
     <view class="h">选择颗粒网格</view>
     <view class="chips">
-      <view wx:for="{{gridOptions}}" wx:key="value" class="chip {{grid === item.value ? 'chip-active' : ''}}" data-value="{{item.value}}" bindtap="setGrid">{{item.label}}</view>
+      <view wx:for="{{gridOptions}}" wx:key="value" class="chip {{!customGrid && grid === item.value ? 'chip-active' : ''}}" data-value="{{item.value}}" bindtap="setGrid">{{item.label}}</view>
+      <view class="chip {{customGrid ? 'chip-active' : ''}}" data-value="custom" bindtap="setGrid">自定义</view>
     </view>
+    <view wx:if="{{customGrid}}" class="custom-grid">
+      <input type="number" value="{{customSize}}" placeholder="每边格数（1～1000）" bindinput="setCustomSize" />
+      <view>正方形网格，最大 1000×1000 格。</view>
+    </view>
+    <view class="grid-hint">大尺寸转换和 Excel 导出需要更长时间；细节色号请在 Excel 中放大查看。</view>
   </view>
 
   <view class="card section">

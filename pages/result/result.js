@@ -116,7 +116,7 @@ Page({
       }
       ctx.strokeStyle = 'rgba(255,255,255,0.22)'
       ctx.lineWidth = Math.max(0.4, cell * 0.04)
-      for (let i = 0; i <= gridSize; i += 1) {
+      for (let i = 0; cell >= 3 && i <= gridSize; i += 1) {
         const p = i * cell
         ctx.beginPath()
         ctx.moveTo(draw.left, draw.top + p)
@@ -161,7 +161,7 @@ Page({
           const color = colorMap[colorIndex] || '#FFFFFF'
           ctx.fillStyle = color
           ctx.fillRect(draw.left + col * cell, draw.top + row * cell, cell, cell)
-          if (colorIndex > 0) {
+          if (colorIndex > 0 && cell >= 2) {
             ctx.fillStyle = this.getTextColorByBg(color)
             ctx.font = `${Math.max(3, cell * 0.28)}px sans-serif`
             ctx.fillText((this.taskData.plan.detail.find(item => item.colorIndex === colorIndex)?.beadCode || String(colorIndex)), draw.left + col * cell + cell / 2, draw.top + row * cell + cell / 2, cell * 0.9)
@@ -170,7 +170,7 @@ Page({
       }
       ctx.strokeStyle = 'rgba(255,255,255,0.22)'
       ctx.lineWidth = Math.max(0.4, cell * 0.04)
-      for (let i = 0; i <= gridSize; i += 1) {
+      for (let i = 0; cell >= 3 && i <= gridSize; i += 1) {
         const p = i * cell
         ctx.beginPath()
         ctx.moveTo(draw.left, draw.top + p)

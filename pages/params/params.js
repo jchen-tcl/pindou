@@ -1,12 +1,8 @@
 const { generateBeadPlan } = require('../../utils/bead')
 const { recordPlanDiagnostics } = require('../../utils/diagnostics')
+const { GRID_SIZES, parseGridSize } = require('../../utils/grid')
 
-const GRID_OPTIONS = [
-  { label: '32x32', value: '32x32' },
-  { label: '48x48', value: '48x48' },
-  { label: '64x64', value: '64x64' },
-  { label: '128x128', value: '128x128' }
-]
+const GRID_OPTIONS = GRID_SIZES.map(size => ({ label: `${size}×${size}`, value: `${size}x${size}` }))
 
 function paletteSettings(version, count) {
   const paletteVersion = String(version) === '291' ? '291' : '221'
@@ -14,12 +10,13 @@ function paletteSettings(version, count) {
   return {
     paletteVersion,
     maxColorCount,
-    colorCount: Math.max(8, Math.min(maxColorCount, Math.floor(Number(count) || 16)))
+    colorCount: Math.max(8, Math.min(maxColorCount, Math.floor(Number(count) || maxColorCount)))
   }
 }
 
 function getErrorMessage(error) {
   const code = error?.message
+  if (code === 'INVALID_GRID_SIZE') return '请输入 1～1000 的整数格数'
   if (code === 'IMAGE_DECODE_FAILED') {
     return '图片解析失败，请先在相册里编辑后再保存'
   }
@@ -35,7 +32,9 @@ Page({
     gridOptions: GRID_OPTIONS,
     sizeLabel: '约 24 × 24 cm（按 5 mm 间距估算）',
     grid: '48x48',
-    colorCount: 16,
+    customGrid: false,
+    customSize: '',
+    colorCount: 221,
     maxColorCount: 221,
     paletteVersion: '221'
   },
@@ -53,6 +52,8 @@ Page({
       imagePath: taskData.imagePath,
       sizeLabel: this.getSizeLabel(taskData.grid || '48x48'),
       grid: taskData.grid || '48x48',
+      customGrid: !!taskData.grid && !GRID_OPTIONS.some(item => item.value === taskData.grid),
+      customSize: taskData.grid ? taskData.grid.split('x')[0] : '',
       ...paletteSettings(taskData.paletteVersion, taskData.colorCount)
     })
   },
@@ -62,16 +63,32 @@ Page({
   },
   setGrid(e) {
     const grid = e.currentTarget.dataset.value
-    this.setData({ grid, sizeLabel: this.getSizeLabel(grid) })
+    if (grid === 'custom') {
+      this.setData({ customGrid: true })
+      this.setCustomSize({ detail: { value: this.data.customSize } })
+      return
+    }
+    this.setData({ grid, customGrid: false, sizeLabel: this.getSizeLabel(grid) })
+  },
+  setCustomSize(e) {
+    const customSize = String(e.detail.value).trim()
+    const grid = `${customSize}x${customSize}`
+    let sizeLabel = '请输入 1～1000 的整数格数'
+    try { parseGridSize(grid); sizeLabel = this.getSizeLabel(grid) } catch (_) {}
+    this.setData({ customSize, grid, sizeLabel })
   },
   setColorCount(e) {
     this.setData(paletteSettings(this.data.paletteVersion, e.detail.value))
   },
   setPaletteVersion(e) {
-    this.setData(paletteSettings(e.detail.value, this.data.colorCount))
+    this.setData(paletteSettings(e.detail.value))
   },
   async startConvert() {
     if (this.converting) {
+      return
+    }
+    try { parseGridSize(this.data.grid) } catch (error) {
+      wx.showToast({ title: getErrorMessage(error), icon: 'none' })
       return
     }
     this.converting = true

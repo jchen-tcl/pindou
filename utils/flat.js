@@ -1,6 +1,14 @@
 const { toOklab, distance, quantize } = require('./quantize')
 const { cleanAssignments } = require('./cleanup')
-const FLAT_ALGORITHM_VERSION = 'flat-v2'
+const FLAT_ALGORITHM_VERSION = 'flat-v3'
+
+function canMergeFill(left, right) {
+  // Light pastel fills can be close to white in total distance while carrying
+  // a distinct hue. Preserve that chromatic difference before merging shades.
+  if (left[0] > 0.85 && right[0] > 0.85 &&
+      Math.hypot(left[1] - right[1], left[2] - right[2]) > 0.025) return false
+  return distance(left, right) <= 0.09 ** 2
+}
 
 function isBoundaryBlend(center, left, right) {
   if (distance(left.lab, right.lab) < 0.09 ** 2) return false
@@ -68,7 +76,7 @@ function flattenColors(pixels, width, diagnostics = {}) {
       rejectedTransitionBins++
       continue
     }
-    if (anchors.every(anchor => distance(bin.lab, anchor.lab) > 0.09 ** 2)) anchors.push(bin)
+    if (anchors.every(anchor => !canMergeFill(bin.lab, anchor.lab))) anchors.push(bin)
   }
   // Thin ink strokes may have no flat interior after sampling. Give their most
   // frequent dark neutral a shared anchor, instead of splitting their votes.
@@ -112,8 +120,8 @@ function quantizeFlat(pixels, sampleWidth, gridSize, palette, limit, diagnostics
     throw new Error('INVALID_SAMPLE_GRID')
   }
   const flat = flattenColors(pixels, sampleWidth, diagnostics)
-  const cells = []
-  for (let row = 0; row < gridSize; row++) {
+  const cells = scale === 1 ? flat : []
+  for (let row = 0; scale > 1 && row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
       const votes = new Map()
       const center = flat[(row * scale + Math.floor(scale / 2)) * sampleWidth + col * scale + Math.floor(scale / 2)]
