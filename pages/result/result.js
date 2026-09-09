@@ -1,4 +1,5 @@
 const { buildXlsxBuffer, saveBinaryFile } = require('../../utils/exporter')
+const { FLAT_ALGORITHM_VERSION } = require('../../utils/flat')
 
 Page({
   data: {
@@ -21,8 +22,10 @@ Page({
       })
       return
     }
+    if (this.redirectStalePlan(taskData)) return
     this.taskData = taskData
     this.setData({
+      generationLabel: `${taskData.plan.appVersion} · 纯色优化`,
       imagePath: taskData.imagePath,
       sizeLabel: taskData.sizeLabel,
       paletteVersion: taskData.plan.paletteVersion || taskData.paletteVersion || '221',
@@ -35,7 +38,24 @@ Page({
       }))
     })
   },
+  onShow() {
+    this.redirectStalePlan(this.taskData || getApp().globalData.taskData)
+  },
+  redirectStalePlan(taskData) {
+    if (this.redirectingStalePlan) return true
+    if (!taskData?.plan || taskData.plan.algorithmVersion === FLAT_ALGORITHM_VERSION) return false
+    this.redirectingStalePlan = true
+    wx.redirectTo({
+      url: '/pages/params/params?updated=1',
+      fail: () => {
+        this.redirectingStalePlan = false
+        wx.showToast({ title: '算法已更新，请返回参数页重新转换', icon: 'none' })
+      }
+    })
+    return true
+  },
   onReady() {
+    if (this.redirectingStalePlan) return
     this.renderEffectImage().catch(() => {})
   },
   switchPreview(e) {

@@ -1,4 +1,5 @@
 const { generateBeadPlan } = require('../../utils/bead')
+const { recordPlanDiagnostics } = require('../../utils/diagnostics')
 
 const GRID_OPTIONS = [
   { label: '32x32', value: '32x32' },
@@ -38,7 +39,7 @@ Page({
     maxColorCount: 221,
     paletteVersion: '221'
   },
-  onLoad() {
+  onLoad(options = {}) {
     const app = getApp()
     const taskData = app.globalData.taskData || {}
     if (!taskData.imagePath) {
@@ -48,6 +49,7 @@ Page({
       return
     }
     this.setData({
+      updateNotice: options.updated === '1' ? '配色算法已更新，请重新生成图纸。' : '',
       imagePath: taskData.imagePath,
       sizeLabel: this.getSizeLabel(taskData.grid || '48x48'),
       grid: taskData.grid || '48x48',
@@ -83,9 +85,10 @@ Page({
         imagePath: this.data.imagePath,
         grid: this.data.grid,
         colorCount: this.data.colorCount,
-        styleMode: 'cute',
+        styleMode: 'clean',
         paletteVersion: this.data.paletteVersion
       })
+      recordPlanDiagnostics(plan)
       const app = getApp()
       const prev = app.globalData.taskData || {}
       app.globalData.taskData = {
@@ -93,7 +96,7 @@ Page({
         sizeLabel,
         grid: this.data.grid,
         colorCount: this.data.colorCount,
-        styleMode: 'cute',
+        styleMode: 'clean',
         paletteVersion: plan.paletteVersion,
         plan
       }

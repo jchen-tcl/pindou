@@ -1,7 +1,10 @@
 {
   "description": "拼豆转换器",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "tests" },
+      { "type": "folder", "value": "scripts" }
+    ],
     "include": []
   },
   "setting": {

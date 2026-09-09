@@ -70,3 +70,52 @@ test('navigation errors are surfaced to the user', () => {
   page.goParams()
   assert.match(message, /页面打开失败/)
 })
+
+test('old result plans redirect once to regeneration instead of rendering stale output', () => {
+  let page
+  const redirects = []
+  const oldPlan = { matrix: [[1]], detail: [] }
+  const app = { globalData: { taskData: { imagePath: 'old.webp', plan: oldPlan } } }
+  const load = pageLoader({
+    Page: value => { page = value }, getApp: () => app,
+    wx: { redirectTo: options => redirects.push(options.url) }
+  })
+  load(path.join(root, 'pages/result/result.js'))
+  page.onLoad()
+  page.onShow()
+  page.onReady()
+  assert.deepEqual(redirects, ['/pages/params/params?updated=1'])
+  assert.equal(page.taskData, undefined)
+  assert.equal(app.globalData.taskData.plan, oldPlan, 'keep the existing plan until successful regeneration')
+})
+
+test('current result displays the version from the generated plan', () => {
+  let page
+  const { FLAT_ALGORITHM_VERSION } = require('../utils/flat')
+  const app = { globalData: { taskData: { imagePath: 'new.webp', grid: '32x32', plan: {
+    appVersion: 'v1.0.5', algorithmVersion: FLAT_ALGORITHM_VERSION,
+    paletteVersion: '221', total: 1024, detail: [{ beadCode: 'H7', colorIndex: 1 }]
+  } } } }
+  const load = pageLoader({
+    Page: value => { page = value; page.setData = data => Object.assign(page.data, data) },
+    getApp: () => app,
+    wx: { redirectTo() { assert.fail('current plans must not redirect') } }
+  })
+  load(path.join(root, 'pages/result/result.js'))
+  page.onLoad()
+  page.onShow()
+  assert.equal(page.data.generationLabel, 'v1.0.5 · 纯色优化')
+  assert.equal(page.data.colorCount, 1)
+})
+
+test('home version follows loaded code even when hot reload retains old app globals', () => {
+  let page
+  const app = { globalData: { appVersion: 'v1.0.4' } }
+  const load = pageLoader({
+    Page: value => { page = value; page.setData = data => Object.assign(page.data, data) },
+    getApp: () => app
+  })
+  load(path.join(root, 'pages/index/index.js'))
+  page.onShow()
+  assert.equal(page.data.appVersion, require('../utils/version').APP_VERSION)
+})

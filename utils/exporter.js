@@ -415,6 +415,7 @@ function buildWorkbookXml(sheetNames) {
     .join('')
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <bookViews><workbookView/></bookViews>
   <sheets>${sheets}</sheets>
 </workbook>`
 }
@@ -453,6 +454,7 @@ function buildSheetXml(rows, options = {}) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <dimension ref="${dimension}"/>
+  <sheetViews><sheetView workbookViewId="0" zoomScale="100" zoomScaleNormal="100"/></sheetViews>
   ${sheetFormatPr}
   ${colsXml}
   <sheetData>${rowXml}</sheetData>
@@ -513,9 +515,10 @@ function createXlsxStyleContext(detail) {
     .join('')
   const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="2">
-    <font><sz val="10"/><color rgb="FF333333"/><name val="Calibri"/></font>
+  <fonts count="3">
+    <font><sz val="12"/><color rgb="FF333333"/><name val="Calibri"/></font>
     <font><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><sz val="10"/><color rgb="FF333333"/><name val="Calibri"/></font>
   </fonts>
   <fills count="${2 + colorRows.length}">
     <fill><patternFill patternType="none"/></fill>
@@ -525,8 +528,8 @@ function createXlsxStyleContext(detail) {
   <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
   <cellXfs count="${2 + colorRows.length}">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
     ${colorXfs}
   </cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
@@ -552,7 +555,7 @@ function pickFontId(argb) {
   const g = parseInt(argb.slice(4, 6), 16)
   const b = parseInt(argb.slice(6, 8), 16)
   const luminance = (r * 299 + g * 587 + b * 114) / 1000
-  return luminance >= 150 ? 0 : 1
+  return luminance >= 150 ? 2 : 1
 }
 
 function toColumnName(index) {
@@ -571,8 +574,11 @@ function toExcelRowHeight(pixel) {
 }
 
 function toExcelColumnWidth(pixel) {
-  const width = pixel / 7 - 0.07
-  return Number(Math.max(0.5, width).toFixed(2))
+  // OOXML stores width in Normal-font digit units (including padding), not
+  // Excel's UI character count. Normal is explicitly Calibri 12: MDW = 8 px.
+  // The 8 px basis also scales exactly to 12 px at Windows 150% DPI.
+  // https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.column
+  return Math.floor(pixel / 8 * 256) / 256
 }
 
 function utf8Bytes(input) {

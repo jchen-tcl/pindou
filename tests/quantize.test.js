@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { quantize, toOklab, distance, normalizeStyle } = require('../utils/quantize')
-const { PALETTE } = require('../utils/colors')
+const { PALETTE, getPalette } = require('../utils/colors')
 const palette = PALETTE.map((c, index) => ({ ...c, index, rgb: c.code.slice(1).match(/../g).map(v => parseInt(v, 16)) }))
 
 function frequencyBaseline(pixels, colors, count) {
@@ -59,4 +59,16 @@ test('cute mode preserves dark outlines and restore mode is unchanged', () => {
   assert.deepEqual(normalizeStyle(43, 43, 53, 'cute'), [43, 43, 53])
   assert.deepEqual(normalizeStyle(20, 160, 240, 'restore'), [20, 160, 240])
   assert.ok(normalizeStyle(150, 150, 150, 'cute')[0] > 150)
+})
+
+test('221 and 291 full-color matching equal an independent nearest-color search', () => {
+  const pixels = [[120,164,180], [0,0,0], [250,185,205], [255,255,255]]
+  for (const version of ['221', '291']) {
+    const colors = getPalette(version).map((c,index) => ({ ...c,index,
+      rgb: c.code.slice(1).match(/../g).map(v => parseInt(v,16)) }))
+    const expected = pixels.map(rgb => colors.reduce((best, color) =>
+      distance(toOklab(rgb), toOklab(color.rgb)) < distance(toOklab(rgb), toOklab(best.rgb)) ? color : best))
+    for (const limit of [16, 221, 291]) assert.deepEqual(quantize(pixels, colors, limit), expected)
+    assert.deepEqual(quantize(colors.map(c => c.rgb), colors, colors.length).map(c => c.rgb), colors.map(c => c.rgb))
+  }
 })

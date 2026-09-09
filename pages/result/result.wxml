@@ -15,6 +15,7 @@
 
   <view class="card stats">
     <view class="h">制作信息</view>
+    <view class="line">生成版本：{{generationLabel}}</view>
     <view class="line">色卡：MARD {{paletteVersion}} 色</view>
     <view class="line">成品尺寸：{{sizeLabel}}</view>
     <view class="line">拼豆网格：{{grid}}</view>

@@ -10,7 +10,7 @@ Page({
     const taskData = app.globalData.taskData || {}
     this.setData({
       imagePath: taskData.imagePath || '',
-      appVersion: app.globalData.appVersion || APP_VERSION
+      appVersion: APP_VERSION
     })
   },
   chooseImage() {
@@ -18,7 +18,7 @@ Page({
     this.picking = true
     wx.chooseImage({
       count: 1,
-      sizeType: ['compressed'],
+      sizeType: ['original'],
       sourceType: ['album'],
       success: async (res) => {
         const path = res.tempFilePaths?.[0] || ''
@@ -60,11 +60,8 @@ Page({
     })
   },
   async normalizeImage(path) {
-    const ext = this.getExt(path)
-    const formatExt = ['heic', 'heif', 'tiff', 'tif', 'bmp', 'webp']
-    const needConvert = formatExt.includes(ext)
     const info = await this.getImageInfoSafe(path)
-    if (info?.width && info?.height && !needConvert) {
+    if (info?.width && info?.height) {
       return path
     }
     for (const quality of [82, 60]) {

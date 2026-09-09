@@ -1,6 +1,7 @@
 const { getPalette } = require('./colors')
 const { quantize, normalizeStyle } = require('./quantize')
-const { cleanAssignments } = require('./cleanup')
+const { quantizeFlat, FLAT_ALGORITHM_VERSION } = require('./flat')
+const { APP_VERSION } = require('./version')
 
 const GRID_TO_TOTAL = {
   '32x32': 1024,
@@ -9,7 +10,7 @@ const GRID_TO_TOTAL = {
   '128x128': 16384
 }
 
-async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'cute', cropRatio = 'contain', paletteVersion = '221' }) {
+async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'clean', cropRatio = 'contain', paletteVersion = '221' }) {
   const PALETTE = getPalette(paletteVersion)
   if (!GRID_TO_TOTAL[grid]) grid = '48x48'
   const total = GRID_TO_TOTAL[grid] || 2304
@@ -21,10 +22,13 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     rgb: hexToRgb(item.code)
   }))
   const imageInfo = await getImageInfoSafe(imagePath)
-  const pixelList = (await samplePixels(imagePath, imageInfo, gridSize, cropRatio))
+  const sampleSize = styleMode === 'clean' ? gridSize * 3 : gridSize
+  const pixelList = (await samplePixels(imagePath, imageInfo, sampleSize, cropRatio))
     .map(([r, g, b]) => normalizeStyle(r, g, b, styleMode))
-  const mapped = quantize(pixelList, palette, safeColorCount)
-  const assignments = styleMode === 'clean' ? cleanAssignments(mapped, gridSize) : mapped
+  const diagnostics = { sampleSize, gridSize, requestedColorCount: safeColorCount }
+  const assignments = styleMode === 'clean'
+    ? quantizeFlat(pixelList, sampleSize, gridSize, palette, safeColorCount, diagnostics)
+    : quantize(pixelList, palette, safeColorCount)
   const countMap = new Map()
   const cellsByColor = {}
   const matrix = new Array(gridSize)
@@ -53,6 +57,10 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     }))
     .sort((a, b) => b.count - a.count)
   return {
+    appVersion: APP_VERSION,
+    algorithmVersion: styleMode === 'clean' ? FLAT_ALGORITHM_VERSION : 'quantize-v1',
+    styleMode,
+    diagnostics: { ...diagnostics, actualColorCount: detail.length },
     total,
     paletteVersion: String(paletteVersion) === '291' ? '291' : '221',
     detail,

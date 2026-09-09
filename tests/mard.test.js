@@ -41,3 +41,10 @@ test('cleanup preserves a uniform field', () => {
   const pixels = Array(1024).fill({ index: 0, rgb: [100, 120, 130] })
   assert.deepEqual(cleanAssignments(pixels, 32), pixels)
 })
+
+test('shared 221 colors keep identical RGB and stable indices in the 291 palette', () => {
+  PALETTE.forEach((color, index) => {
+    assert.equal(ALL_COLORS[index].id, color.id)
+    assert.equal(ALL_COLORS[index].code, color.code)
+  })
+})

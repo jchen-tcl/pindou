@@ -153,3 +153,44 @@ test('concurrent preview requests share rendering and failures allow retry', asy
   page.drawEffectImage = () => Promise.resolve('retry.png')
   assert.equal(await page.renderEffectImage(), 'retry.png')
 })
+
+test('default conversion supersamples without brightening and keeps full image bounds', async () => {
+  const calls = mockImage({ width: 200, height: 100, colors: [[100, 160, 180]] })
+  const clean = await generateBeadPlan({ imagePath: 'original', grid: '32x32', colorCount: 16 })
+  assert.deepEqual(calls.draws[0], [0, 0, 200, 100, 0, 24, 96, 48])
+  const restore = await convert()
+  assert.deepEqual(clean.detail, restore.detail)
+  assert.equal(clean.matrix.flat().length, 1024)
+  assert.equal(clean.algorithmVersion, 'flat-v2')
+  assert.equal(clean.diagnostics.sampleSize, 96)
+  assert.equal(clean.diagnostics.anchorColorCount, 2)
+  assert.equal(clean.diagnostics.flatFallback, false)
+  assert.equal(clean.diagnostics.actualColorCount, clean.detail.length)
+  assert.deepEqual(calls.compress, [])
+})
+
+test('parameter page actually uses the clean pipeline and saves matching statistics', async () => {
+  const calls = mockImage()
+  const app = { globalData: { taskData: { imagePath: 'original' } } }
+  global.getApp = () => app
+  Object.assign(global.wx, { showLoading() {}, hideLoading() {}, showToast() {}, navigateTo() {} })
+  let page
+  global.Page = value => { page = value }
+  delete require.cache[require.resolve('../pages/params/params')]
+  require('../pages/params/params')
+  page.data = { ...page.data, imagePath: 'original', grid: '32x32' }
+  await page.startConvert()
+  assert.equal(app.globalData.taskData.styleMode, 'clean')
+  assert.equal(calls.draws[0][6], 96)
+  assert.equal(app.globalData.taskData.plan.detail[0].count, 1024)
+  assert.equal(page.converting, false)
+})
+
+test('decodable WebP input is kept original rather than recompressed', async () => {
+  const calls = mockImage()
+  let page
+  global.Page = value => { page = value }
+  require('../pages/index/index')
+  assert.equal(await page.normalizeImage('original.webp'), 'original.webp')
+  assert.deepEqual(calls.compress, [])
+})

@@ -1,4 +1,5 @@
 <view class="page">
+  <view wx:if="{{updateNotice}}" class="card section">{{updateNotice}}</view>
   <view class="card section">
     <view class="h">MARD 色卡</view>
     <radio-group bindchange="setPaletteVersion">
@@ -21,6 +22,7 @@
 
   <view class="card section">
     <view class="h">最多使用：{{colorCount}}色</view>
+    <view>自动合并相近颜色、减少杂色，适合卡通和插画；实际用色可能少于上限。</view>
     <slider min="8" max="{{maxColorCount}}" step="1" value="{{colorCount}}" activeColor="#ff8fbe" block-color="#ffd0e4" bindchange="setColorCount" />
   </view>
 
