@@ -3,11 +3,11 @@ const { quantize, normalizeStyle } = require('./quantize')
 const { quantizeFlat, FLAT_ALGORITHM_VERSION } = require('./flat')
 const { APP_VERSION } = require('./version')
 const { parseGridSize, getSampleSize } = require('./grid')
+const { whiteBounds } = require('./trim')
 
-async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'clean', cropRatio = 'contain', paletteVersion = '221' }) {
+async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, styleMode = 'clean', cropRatio = 'contain', paletteVersion = '221', trimWhite = false }) {
   const PALETTE = getPalette(paletteVersion)
   const gridSize = parseGridSize(grid)
-  const total = gridSize * gridSize
   const safeColorCount = Math.max(1, Math.min(Math.floor(Number(colorCount) || 16), PALETTE.length))
   const palette = PALETTE.map((item, index) => ({
     ...item,
@@ -25,12 +25,14 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     ? quantizeFlat(pixelList, sampleSize, gridSize, palette, safeColorCount, diagnostics)
     : quantize(pixelList, palette, safeColorCount)
   const countMap = new Map()
+  const bounds = trimWhite ? whiteBounds(assignments, gridSize) : { left: 0, top: 0, width: gridSize, height: gridSize }
+  const total = bounds.width * bounds.height
   const cellsByColor = {}
-  const matrix = new Array(gridSize)
-  for (let row = 0; row < gridSize; row += 1) {
-    const rowColors = new Array(gridSize)
-    for (let col = 0; col < gridSize; col += 1) {
-      const i = row * gridSize + col
+  const matrix = new Array(bounds.height)
+  for (let row = 0; row < bounds.height; row += 1) {
+    const rowColors = new Array(bounds.width)
+    for (let col = 0; col < bounds.width; col += 1) {
+      const i = (row + bounds.top) * gridSize + col + bounds.left
       const color = assignments[i]
       countMap.set(color.index, (countMap.get(color.index) || 0) + 1)
       if (!cellsByColor[color.index]) {
@@ -61,6 +63,10 @@ async function generateBeadPlan({ imagePath, grid = '48x48', colorCount = 16, st
     detail,
     matrix,
     gridSize,
+    gridWidth: bounds.width,
+    gridHeight: bounds.height,
+    trimBounds: bounds,
+    trimmedBeads: gridSize * gridSize - total,
     cellsByColor
   }
 }

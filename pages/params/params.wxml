@@ -34,7 +34,8 @@
 
   <view class="card section preview-box">
     <view class="h">预览</view>
-    <view>保留整张图片，非正方形图片居中补浅色背景；背景计入用豆量。</view>
+    <view class="radio-item"><switch checked="{{trimWhite}}" bindchange="setTrimWhite" />自动裁掉四周白边</view>
+    <view>保留主体内的白色，只裁掉外围整行、整列的白色空边；用豆量按裁剪后计算。</view>
     <image src="{{imagePath}}" mode="aspectFit" class="preview" />
   </view>
 

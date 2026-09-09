@@ -1,5 +1,6 @@
 const { buildXlsxBuffer, saveBinaryFile } = require('../../utils/exporter')
 const { FLAT_ALGORITHM_VERSION } = require('../../utils/flat')
+const { drawRoundBead } = require('../../utils/bead-preview')
 
 Page({
   data: {
@@ -23,13 +24,23 @@ Page({
       return
     }
     if (this.redirectStalePlan(taskData)) return
+    this.loadTask(taskData)
+  },
+  loadTask(taskData) {
     this.taskData = taskData
+    this.renderEpoch = (this.renderEpoch || 0) + 1
+    this.effectImagePath = ''
+    this.effectCodeImagePath = ''
+    this.roundImagePath = ''
     this.setData({
       generationLabel: `${taskData.plan.appVersion} · 纯色优化`,
+      editedLabel: taskData.plan.manualEdited ? `已手动调整 · ${taskData.plan.editedAppVersion}` : '',
+      emptyCells: taskData.plan.emptyCells || 0,
       imagePath: taskData.imagePath,
       sizeLabel: taskData.sizeLabel,
       paletteVersion: taskData.plan.paletteVersion || taskData.paletteVersion || '221',
-      grid: taskData.grid,
+      grid: `${taskData.plan.gridWidth || taskData.plan.gridSize}×${taskData.plan.gridHeight || taskData.plan.gridSize}`,
+      trimmedBeads: taskData.plan.trimmedBeads || 0,
       colorCount: taskData.plan.detail.length,
       total: taskData.plan.total,
       detail: taskData.plan.detail.map((item) => ({
@@ -39,7 +50,12 @@ Page({
     })
   },
   onShow() {
-    this.redirectStalePlan(this.taskData || getApp().globalData.taskData)
+    const taskData = getApp().globalData.taskData
+    if (this.redirectStalePlan(taskData)) return
+    if (taskData?.plan && taskData.plan !== this.taskData?.plan) {
+      this.loadTask(taskData)
+      if (this.ready) this.refreshPreview()
+    }
   },
   redirectStalePlan(taskData) {
     if (this.redirectingStalePlan) return true
@@ -56,7 +72,25 @@ Page({
   },
   onReady() {
     if (this.redirectingStalePlan) return
+    this.ready = true
     this.renderEffectImage().catch(() => {})
+  },
+  refreshPreview() {
+    // Wait for any old render to settle, then render the updated plan.
+    Promise.allSettled([this.effectRenderPromise, this.codeRenderPromise, this.roundRenderPromise]).then(() => {
+      if (this.data.previewMode === 'round') this.renderRoundImage().catch(() => {})
+      if (this.data.previewMode === 'effect_code') this.renderEffectCodeImage().catch(() => {})
+      else if (this.data.previewMode === 'effect') this.renderEffectImage().catch(() => {})
+    })
+  },
+  async editPlan() {
+    if (this.openingEditor) return
+    this.openingEditor = true
+    await Promise.allSettled([this.effectRenderPromise, this.codeRenderPromise, this.roundRenderPromise])
+    wx.navigateTo({ url: '/pages/editor/editor',
+      fail: () => wx.showToast({ title: '编辑页打开失败，请重试', icon: 'none' }),
+      complete: () => { this.openingEditor = false }
+    })
   },
   switchPreview(e) {
     const mode = e.currentTarget.dataset.mode
@@ -64,6 +98,9 @@ Page({
       return
     }
     this.setData({ previewMode: mode }, () => {
+      if (mode === 'round' && !this.roundImagePath) {
+        setTimeout(() => { this.renderRoundImage().catch(() => {}) }, 50)
+      }
       if (mode === 'effect' && !this.effectImagePath) {
         setTimeout(() => {
           this.renderEffectImage().catch(() => {})
@@ -92,106 +129,105 @@ Page({
     }
     return this.codeRenderPromise
   },
-  async drawEffectImage() {
-    const matrix = this.taskData?.plan?.matrix || []
-    if (!matrix.length) {
-      return
+  drawEffectImage() { return this.drawPreview(false) },
+  renderRoundImage() {
+    if (!this.roundRenderPromise) {
+      this.roundRenderPromise = this.drawPreview(false, true).finally(() => { this.roundRenderPromise = null })
     }
+    return this.roundRenderPromise
+  },
+  drawEffectCodeImage() { return this.drawPreview(true) },
+  async drawPreview(withCode, round = false) {
+    const plan = this.taskData?.plan
+    const matrix = plan?.matrix || []
+    if (!matrix.length) return
+    const epoch = this.renderEpoch
     try {
-      const { canvas, width, height } = await this.getCanvasNode('#effectCanvas')
+      const { canvas, width, height } = await this.getCanvasNode(round ? '#roundCanvas' : withCode ? '#effectCodeCanvas' : '#effectCanvas')
+      if (epoch !== this.renderEpoch) return
       const ctx = canvas.getContext('2d')
-      const gridSize = matrix.length
-      const colorMap = this.buildColorMap(this.taskData.plan.detail)
-      const draw = this.getEffectDrawRect(width, height)
-      ctx.clearRect(0, 0, width, height)
-      const cell = draw.size / gridSize
-      for (let row = 0; row < gridSize; row += 1) {
-        const line = matrix[row]
-        for (let col = 0; col < gridSize; col += 1) {
-          const colorIndex = line[col]
-          const color = colorMap[colorIndex] || '#FFFFFF'
-          ctx.fillStyle = color
-          ctx.fillRect(draw.left + col * cell, draw.top + row * cell, cell, cell)
+      const rows = matrix.length, cols = matrix[0].length
+      const colors = this.buildColorMap(plan.detail)
+      const beadSprites = {}
+      if (round && typeof wx.createOffscreenCanvas === 'function') {
+        for (const item of plan.detail) {
+          try {
+            const sprite = wx.createOffscreenCanvas({ type: '2d', width: 48, height: 48 })
+            sprite.width = 48; sprite.height = 48
+            drawRoundBead(sprite.getContext('2d'), item.code, 0, 0, 48)
+            beadSprites[item.colorIndex] = sprite
+          } catch (_) { break }
         }
       }
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-      ctx.lineWidth = Math.max(0.4, cell * 0.04)
-      for (let i = 0; cell >= 3 && i <= gridSize; i += 1) {
-        const p = i * cell
-        ctx.beginPath()
-        ctx.moveTo(draw.left, draw.top + p)
-        ctx.lineTo(draw.left + draw.size, draw.top + p)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(draw.left + p, draw.top)
-        ctx.lineTo(draw.left + p, draw.top + draw.size)
-        ctx.stroke()
-      }
-      this.canvasNode = canvas
-      this.canvasSize = { width, height }
-      this.effectImagePath = await this.canvasToImagePath(canvas, width, height)
-      return this.effectImagePath
-    } catch (error) {
-      wx.showToast({
-        title: '效果图生成失败',
-        icon: 'none'
-      })
-      throw error
-    }
-  },
-  async drawEffectCodeImage() {
-    const matrix = this.taskData?.plan?.matrix || []
-    if (!matrix.length) {
-      return
-    }
-    try {
-      const { canvas, width, height } = await this.getCanvasNode('#effectCodeCanvas')
-      const ctx = canvas.getContext('2d')
-      const gridSize = matrix.length
-      const colorMap = this.buildColorMap(this.taskData.plan.detail)
+      const labels = Object.fromEntries(plan.detail.map(c => [c.colorIndex, c.beadCode || String(c.colorIndex)]))
       const draw = this.getEffectDrawRect(width, height)
+      const cell = draw.size / Math.max(rows, cols)
+      draw.left += (draw.size - cols * cell) / 2
+      draw.top += (draw.size - rows * cell) / 2
       ctx.clearRect(0, 0, width, height)
-      const cell = draw.size / gridSize
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      for (let row = 0; row < gridSize; row += 1) {
-        const line = matrix[row]
-        for (let col = 0; col < gridSize; col += 1) {
-          const colorIndex = Number(line[col] || 0)
-          const color = colorMap[colorIndex] || '#FFFFFF'
-          ctx.fillStyle = color
-          ctx.fillRect(draw.left + col * cell, draw.top + row * cell, cell, cell)
-          if (colorIndex > 0 && cell >= 2) {
+      if (round) { ctx.fillStyle = '#f1f3f5'; ctx.fillRect(0, 0, width, height) }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const value = matrix[row][col]
+          const color = colors[value] || '#FFFFFF'
+          const x = draw.left + col * cell, y = draw.top + row * cell
+          if (round) {
+            if (value) {
+              if (beadSprites[value]) ctx.drawImage(beadSprites[value], x, y, cell, cell)
+              else drawRoundBead(ctx, color, x, y, cell)
+            }
+            continue
+          }
+          ctx.fillStyle = value ? color : ((row + col) % 2 ? '#cdd6df' : '#e8edf2')
+          ctx.fillRect(x, y, cell, cell)
+          if (!value && cell >= 6) {
+            ctx.fillStyle = '#f7f9fb'
+            ctx.fillRect(x, y, cell / 2, cell / 2)
+            ctx.fillRect(x + cell / 2, y + cell / 2, cell / 2, cell / 2)
+          }
+          if (withCode && value && cell >= 2) {
             ctx.fillStyle = this.getTextColorByBg(color)
-            ctx.font = `${Math.max(3, cell * 0.28)}px sans-serif`
-            ctx.fillText((this.taskData.plan.detail.find(item => item.colorIndex === colorIndex)?.beadCode || String(colorIndex)), draw.left + col * cell + cell / 2, draw.top + row * cell + cell / 2, cell * 0.9)
+            ctx.font = `${Math.max(3, cell * .28)}px sans-serif`
+            ctx.fillText(labels[value], x + cell / 2, y + cell / 2, cell * .9)
           }
         }
+        if (round && rows > 128 && row % 32 === 31) {
+          await new Promise(resolve => setTimeout(resolve, 0))
+          if (epoch !== this.renderEpoch) return
+        }
       }
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-      ctx.lineWidth = Math.max(0.4, cell * 0.04)
-      for (let i = 0; cell >= 3 && i <= gridSize; i += 1) {
-        const p = i * cell
+      if (!round && cell >= 3) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)'
+        ctx.lineWidth = Math.max(.4, cell * .04)
         ctx.beginPath()
-        ctx.moveTo(draw.left, draw.top + p)
-        ctx.lineTo(draw.left + draw.size, draw.top + p)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(draw.left + p, draw.top)
-        ctx.lineTo(draw.left + p, draw.top + draw.size)
+        for (let row = 0; row <= rows; row++) {
+          ctx.moveTo(draw.left, draw.top + row * cell)
+          ctx.lineTo(draw.left + cols * cell, draw.top + row * cell)
+        }
+        for (let col = 0; col <= cols; col++) {
+          ctx.moveTo(draw.left + col * cell, draw.top)
+          ctx.lineTo(draw.left + col * cell, draw.top + rows * cell)
+        }
         ctx.stroke()
       }
-      this.effectCodeImagePath = await this.canvasToImagePath(canvas, width, height)
-      return this.effectCodeImagePath
+      const path = await this.canvasToImagePath(canvas, width, height)
+      if (epoch !== this.renderEpoch) return
+      if (round) this.roundImagePath = path
+      else if (withCode) this.effectCodeImagePath = path
+      else {
+        this.canvasNode = canvas
+        this.canvasSize = { width, height }
+        this.effectImagePath = path
+      }
+      return path
     } catch (error) {
-      wx.showToast({
-        title: '色号效果图生成失败',
-        icon: 'none'
-      })
+      if (epoch === this.renderEpoch) wx.showToast({ title: '效果图生成失败，请重试', icon: 'none' })
       throw error
     }
   },
   ensureEffectReady() {
+    if (this.data.previewMode === 'round') return this.roundImagePath ? Promise.resolve(this.roundImagePath) : this.renderRoundImage()
     if (this.effectImagePath) {
       return Promise.resolve(this.effectImagePath)
     }
@@ -400,6 +436,7 @@ Page({
           const type = this.parseSaveErrorType(error)
           if (type === 'invalid_file' && retryCount < 1) {
             this.effectImagePath = ''
+            this.roundImagePath = ''
             this.ensureEffectReady()
               .then((newPath) => {
                 save(newPath, retryCount + 1)

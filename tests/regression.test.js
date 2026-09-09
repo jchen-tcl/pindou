@@ -44,6 +44,24 @@ const convert = (options = {}) => generateBeadPlan({
   imagePath: 'original', grid: '32x32', colorCount: 16, styleMode: 'restore', ...options
 })
 
+test('trimmed rectangular plans update counts, coordinates and Excel dimensions', async () => {
+  mockImage({ width: 200, height: 100 })
+  const plan = await convert({ trimWhite: true })
+  assert.equal(plan.gridWidth, 32)
+  assert.equal(plan.gridHeight, 16)
+  assert.equal(plan.trimmedBeads, 512)
+  assert.equal(plan.total, 512)
+  assert.equal(plan.matrix.length, 16)
+  assert.ok(plan.matrix.every(row => row.length === 32))
+  assert.equal(plan.detail.reduce((sum, c) => sum + c.count, 0), 512)
+  assert.equal(plan.detail.length, 1)
+  const cells = Object.values(plan.cellsByColor).flat()
+  assert.equal(cells.length, 512)
+  assert.ok(cells.every(c => c.row >= 1 && c.row <= 16 && c.col >= 1 && c.col <= 32))
+  const xlsx = Buffer.from(buildXlsxBuffer({ plan }))
+  assert.ok(xlsx.includes(Buffer.from('A1:AF16')))
+})
+
 test('large and custom clean plans retain every cell and correct totals', async () => {
   for (const size of [256, 512, 777, 1000]) {
     mockImage({ width: 200, height: 100, colors: [[249, 240, 205]] })

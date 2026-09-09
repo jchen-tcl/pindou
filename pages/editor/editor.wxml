@@ -1,0 +1,39 @@
+<view class="editor-page">
+  <view class="editor-heading">
+    <view><text class="title">手动调整</text><text class="dimensions">{{cols}} × {{rows}} 格</text></view>
+    <view class="subtitle">{{dirty ? '有未保存修改' : '图纸未修改'}} · 空格不计入用豆量</view>
+  </view>
+  <view class="tools">
+    <button wx:for="{{tools}}" wx:key="id" class="tool {{tool === item.id ? 'selected' : ''}}" data-tool="{{item.id}}" bindtap="selectTool" disabled="{{busy}}">{{item.label}}</button>
+  </view>
+  <view class="canvas-wrap">
+    <canvas type="2d" id="editCanvas" class="edit-canvas" catchtouchstart="touchStart" catchtouchmove="touchMove" catchtouchend="touchEnd" catchtouchcancel="touchCancel"></canvas>
+    <view wx:if="{{!ready}}" class="canvas-message">{{canvasError ? '画布加载失败，请返回后重试' : '正在准备图纸…'}}</view>
+  </view>
+  <view class="view-controls">
+    <button size="mini" bindtap="zoomOut" disabled="{{busy || !ready}}">－</button>
+    <text>{{zoomLabel}}</text>
+    <button size="mini" bindtap="zoomIn" disabled="{{busy || !ready}}">＋</button>
+    <button size="mini" bindtap="fit" disabled="{{busy || !ready}}">全图</button>
+    <button size="mini" bindtap="editZoom" disabled="{{busy || !ready}}">放大编辑</button>
+  </view>
+  <view class="hint">{{editable ? toolHint : '先点“放大编辑”或双指放大，再改色；用“移动”查看其它位置。'}}</view>
+  <view class="position">{{positionLabel || '点击格子查看行列与色号'}} · 棋盘格为空，纯白格为白色豆子</view>
+  <view class="palette-label">选色：{{selectedLabel}} <text>仅使用本次编辑开始时已有颜色</text></view>
+  <scroll-view scroll-x class="palette">
+    <view class="palette-row">
+      <view wx:for="{{palette}}" wx:key="colorIndex" class="swatch {{selectedColor === item.colorIndex ? 'swatch-selected' : ''}}" data-color="{{item.colorIndex}}" bindtap="selectColor">
+        <view class="swatch-color" style="background: {{item.code}};"></view>
+        <text>{{item.beadCode}}</text>
+      </view>
+    </view>
+  </scroll-view>
+  <view class="editor-actions">
+    <button class="minor" bindtap="undo" disabled="{{!canUndo || busy}}">撤销</button>
+    <button class="minor" bindtap="redo" disabled="{{!canRedo || busy}}">重做</button>
+    <button class="minor" bindtap="cancelEdit" disabled="{{busy}}">取消</button>
+    <button class="save" bindtap="saveEdit" disabled="{{busy || !ready}}">完成</button>
+  </view>
+</view>
+<!-- Consume native back/edge-swipe while a draft is dirty, then offer save/discard. -->
+<page-container show="{{guardOpen}}" overlay="{{false}}" duration="{{0}}" custom-style="height: 0; background: transparent;" bindafterleave="guardLeave"></page-container>

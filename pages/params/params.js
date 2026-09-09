@@ -34,6 +34,7 @@ Page({
     grid: '48x48',
     customGrid: false,
     customSize: '',
+    trimWhite: true,
     colorCount: 221,
     maxColorCount: 221,
     paletteVersion: '221'
@@ -50,6 +51,7 @@ Page({
     this.setData({
       updateNotice: options.updated === '1' ? '配色算法已更新，请重新生成图纸。' : '',
       imagePath: taskData.imagePath,
+      trimWhite: taskData.trimWhite !== false,
       sizeLabel: this.getSizeLabel(taskData.grid || '48x48'),
       grid: taskData.grid || '48x48',
       customGrid: !!taskData.grid && !GRID_OPTIONS.some(item => item.value === taskData.grid),
@@ -83,6 +85,9 @@ Page({
   setPaletteVersion(e) {
     this.setData(paletteSettings(e.detail.value))
   },
+  setTrimWhite(e) {
+    this.setData({ trimWhite: e.detail.value })
+  },
   async startConvert() {
     if (this.converting) {
       return
@@ -103,6 +108,7 @@ Page({
         grid: this.data.grid,
         colorCount: this.data.colorCount,
         styleMode: 'clean',
+        trimWhite: this.data.trimWhite,
         paletteVersion: this.data.paletteVersion
       })
       recordPlanDiagnostics(plan)
@@ -110,7 +116,8 @@ Page({
       const prev = app.globalData.taskData || {}
       app.globalData.taskData = {
         ...prev,
-        sizeLabel,
+        sizeLabel: `约 ${plan.gridWidth * 0.5} × ${plan.gridHeight * 0.5} cm（按 5 mm 间距估算）`,
+        trimWhite: this.data.trimWhite,
         grid: this.data.grid,
         colorCount: this.data.colorCount,
         styleMode: 'clean',

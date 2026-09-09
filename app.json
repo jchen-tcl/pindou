@@ -2,7 +2,8 @@
   "pages": [
     "pages/index/index",
     "pages/params/params",
-    "pages/result/result"
+    "pages/result/result",
+    "pages/editor/editor"
   ],
   "window": {
     "navigationBarTitleText": "拼豆转换器",
